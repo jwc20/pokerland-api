@@ -5,8 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "django-ninja>=1.6.2",
     "django-rest-knox>=5.0.4",
+    "djangorestframework-stubs>=3.17.0",
 ]
 
 [dependency-groups]
