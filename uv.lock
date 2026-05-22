@@ -35,19 +35,6 @@ wheels = [
 ]
 
 [[package]]
-name = "django-rest-knox"
-version = "5.0.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "djangorestframework" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/dd/92d89fb625003a35e94258845ea9d5e3216024e5db206d7f45e37133c35b/django_rest_knox-5.0.4.tar.gz", hash = "sha256:0155c0df3d5f66810d98e16d226603fcca224c1cc4c1283faf569b72b726c93c", size = 19184, upload-time = "2026-03-10T17:00:22.114Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/2d/e5d76075bec24354474a30652d3aa6c52345ea07853c38d4bb8a3057d0de/django_rest_knox-5.0.4-py3-none-any.whl", hash = "sha256:b4a00d0298286198636ef78a7c9c83be8be2156e5ea771d421fb713d20787414", size = 15946, upload-time = "2026-03-10T17:00:20.489Z" },
-]
-
-[[package]]
 name = "django-stubs"
 version = "6.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -159,7 +146,6 @@ name = "pokerland-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "django-rest-knox" },
     { name = "djangorestframework-stubs" },
     { name = "drf-spectacular" },
 ]
@@ -171,7 +157,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "django-rest-knox", specifier = ">=5.0.4" },
     { name = "djangorestframework-stubs", specifier = ">=3.17.0" },
     { name = "drf-spectacular", specifier = ">=0.29.0" },
 ]

@@ -24,10 +24,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # third-party
     "rest_framework",
-    "knox",
     "drf_spectacular",
-    # local
-    "pokerlandapi",
+    "corsheaders",
+    # custom apps
+    "users",
+    "auth_tokens",
 ]
 
 REST_FRAMEWORK = {
