@@ -25,7 +25,7 @@ schema_view = get_schema_view(
         title=f"[{settings.ENV}] Essentory API",
         default_version=settings.ALLOWED_VERSIONS[-1],
         description=f"""
-# drf-yasg 라이브러리를 통해 자동 생성된 SWAGGER 형식의 문서
+# SWAGGER document auto-generated via the drf-yasg library.
 """,
     ),
     public=True,
@@ -34,16 +34,16 @@ schema_view = get_schema_view(
 
 
 @custom_swagger_auto_schema(
-    operation_summary="환경명 체크를 위한 dummy(캐시: 10초)",
+    operation_summary="Dummy endpoint for environment check (cache: 10s)",
     operation_description="""
-    ### 인증 및 권한
+    ### Authentication and Authorization
     1. api-key
     ---
     """,
     method="get",
     responses={
         status.HTTP_200_OK: openapi.Response(
-            description="""환경명 체크를 위한 dummy, 환경을 보여줌""",
+            description="""Dummy endpoint for environment checks; returns current environment.""",
             schema=EnvNameResponseSerializer,
         ),
     },

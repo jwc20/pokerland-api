@@ -69,9 +69,9 @@ class UserEmailLoginAPIView(GenericAPIView):
     serializer_class = UserEmailLoginSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="이메일을 통한 로그인",
+        operation_summary="Login with email",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
         """,
@@ -104,9 +104,9 @@ class UserEmailSignupAPIView(GenericAPIView):
     serializer_class = UserEmailSignupSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="이메일을 통한 회원가입(이메일 인증 필요)",
+        operation_summary="Sign up with email (email verification required)",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
         """,
@@ -142,11 +142,11 @@ class MyProfileAPIView(GenericAPIView):
     authentication_classes = [StrictTokenAuthentication]
 
     @custom_swagger_auto_schema(
-        operation_summary="고객 본인 정보 보기",
+        operation_summary="Get my profile",
         operation_description="""
-            ### 인증 및 권한
+            ### Authentication and Authorization
             1. api-key
-            2. Token (로그인 필요)
+            2. Token (login required)
             ---
             """,
         responses=get_swagger_response_dict(
@@ -161,18 +161,18 @@ class MyProfileAPIView(GenericAPIView):
         )
 
 
-# TODO - 테스트 필요
+# TODO - Add tests
 class MyProfileUpdateAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = [StrictTokenAuthentication]
     serializer_class = UserMyProfileUpdateSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="고객 본인 정보 수정",
+        operation_summary="Update my profile",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
         """,
         responses=get_swagger_response_dict(
@@ -198,11 +198,11 @@ class UserLogoutAPIView(GenericAPIView):
     serializer_class = EmptySerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="로그아웃",
+        operation_summary="Logout",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
         """,
         responses=get_swagger_response_dict(
@@ -212,7 +212,7 @@ class UserLogoutAPIView(GenericAPIView):
     )
     def post(self, request, *args, **kwargs):
         user = request.user
-        # TODO - 아래 로직 모듈화 필요
+        # TODO - Extract the logic below into a reusable module.
         token_value = request.META.get(
             f"HTTP_{settings.AUTH_TOKEN_SETTING['AUTH_HEADER_PREFIX'].upper()}", None
         )
@@ -228,14 +228,14 @@ class UserEmailSendConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserEmailSendConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="제출한 이메일로 인증 코드 전송",
+        operation_summary="Send verification code to submitted email",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        ### 참고 사항
-        전송된 이메일 인증코드는 {0}분 이내에 입력해야 합니다.
-        10분 이내에 최대 3회까지만 요청할 수 있습니다.
+        ### Notes
+        The emailed verification code must be entered within {0} minutes.
+        You can request it up to 3 times within 10 minutes.
         """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
@@ -268,13 +268,13 @@ class UserEmailCheckConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserEmailCheckConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="인증 코드 확인 prod 이외 환경에서는 무조건 `000000`",
+        operation_summary="Verify code (always `000000` in non-prod environments)",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        ### 참고 사항
-        이메일 인증코드는 {0}분 이내에 입력해야 합니다.
+        ### Notes
+        The email verification code must be entered within {0} minutes.
         """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
@@ -307,14 +307,14 @@ class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserFindPwEmailSendConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="비밀번호 찾기 이메일로 인증 코드 전송",
+        operation_summary="Send verification code for password reset",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        ### 참고 사항
-        전송된 이메일 인증코드는 {0}분 이내에 입력해야 합니다.
-        10분 이내에 최대 3회까지만 요청할 수 있습니다.
+        ### Notes
+        The emailed verification code must be entered within {0} minutes.
+        You can request it up to 3 times within 10 minutes.
         """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
@@ -348,13 +348,13 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserFindPwEmailCheckConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="비밀번호 찾기 인증 코드 확인 prod 이외 환경에서는 무조건 `000000`",
+        operation_summary="Verify password-reset code (always `000000` in non-prod)",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        ### 참고 사항
-        이메일 인증코드는 {0}분 이내에 입력해야 합니다.
+        ### Notes
+        The email verification code must be entered within {0} minutes.
         """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
@@ -396,9 +396,9 @@ class UserEmailResetPwAPIView(GenericAPIView):
     serializer_class = UserEmailResetPwSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="비밀번호 변경",
+        operation_summary="Reset password",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
         """,
@@ -436,9 +436,9 @@ class UserEmailAvailabilityAPIView(GenericAPIView):
     serializer_class = UserEmailAvailabilitySerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="이메일 사용 가능 여부 확인",
+        operation_summary="Check email availability",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
         """,
@@ -469,9 +469,9 @@ class UserTagAvailabilityAPIView(GenericAPIView):
     serializer_class = UserTagAvailabilitySerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="유저 태그 사용 가능 여부 확인",
+        operation_summary="Check user tag availability",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
         """,
@@ -506,15 +506,15 @@ class UserDeleteAccountAPIView(GenericAPIView):
     serializer_class = UserDeleteAccountSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="계정 삭제(탈퇴)",
+        operation_summary="Delete account (withdrawal)",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
-        ### 참고 사항
-        계정 삭제 시 30일의 복구 기간이 제공됩니다.
-        30일 이내에 계정 복구가 가능하며, 이후에는 영구 삭제됩니다.
+        ### Notes
+        Deleting an account provides a 30-day recovery period.
+        The account can be recovered within 30 days, then it is permanently deleted.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: EmptySerializer},
@@ -534,14 +534,14 @@ class UserDeleteAccountAPIView(GenericAPIView):
 
     #
     # @custom_swagger_auto_schema(
-    #     operation_summary="계정 삭제(탈퇴) 확인 페이지",
+    #     operation_summary="Account deletion confirmation page",
     #     operation_description="""
-    #     ### 인증 및 권한
+    #     ### Authentication and Authorization
     #     1. api-key
-    #     2. Token (로그인 필요)
+    #     2. Token (login required)
     #     ---
-    #     ### 참고 사항
-    #     계정 삭제 확인을 위한 정보를 조회합니다.
+    #     ### Notes
+    #     Retrieves information for account deletion confirmation.
     #     """,
     #     responses=get_swagger_response_dict(
     #         success_response={status.HTTP_200_OK: UserMyProfileResponseSerializer},
@@ -562,15 +562,15 @@ class UserRecoverAccountAPIView(GenericAPIView):
     serializer_class = UserRecoverAccountSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="계정 복구",
+        operation_summary="Recover account",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
-        ### 참고 사항
-        삭제 요청된 계정은 30일 이내에 복구할 수 있습니다.
-        30일이 지난 후에는 계정을 복구할 수 없습니다.
+        ### Notes
+        An account marked for deletion can be recovered within 30 days.
+        After 30 days, it can no longer be recovered.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: EmptySerializer},
@@ -599,15 +599,15 @@ class UserTagUpdateAPIView(GenericAPIView):
     serializer_class = UsernameUpdateSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="프로필 태그 변경",
+        operation_summary="Change profile tag",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
-        ### 참고 사항
-        프로필 태그는 31일에 한 번만 변경할 수 있습니다.
-        프로필 태그 변경 시 사용자의 모든 컨텐츠, 게시글, 댓글 등에 변경사항이 자동으로 반영됩니다.
+        ### Notes
+        Profile tag can be changed only once every 31 days.
+        When changed, updates are reflected automatically across user content, posts, and comments.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: UserMyProfileResponseSerializer},
@@ -637,11 +637,11 @@ class UserProfileAPIView(GenericAPIView):
     authentication_classes = [StrictTokenAuthentication]
 
     @custom_swagger_auto_schema(
-        operation_summary="유저 프로필 조회",
+        operation_summary="Get user profile",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
-        2. Token (로그인 필요)
+        2. Token (login required)
         ---
         """,
         responses=get_swagger_response_dict(
@@ -665,17 +665,18 @@ class UserSocialCheckAPIView(GenericAPIView):
     serializer_class = UserSocialCheckRequestSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="소셜 로그인 유효성 검사",
+        operation_summary="Validate social login",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        access_token이 유효하지않으면 TokenAuthenticationFailed 에러를 반환합니다
-        social_uuid는 회원가입과 로그인에 사용되는 고유 식별자입니다.
-        is_new가 True이면 소셜 로그인 신규 가입 프로세스를 진행합니다.
-        is_new가 False이면 소셜 로그인 기존 가입 프로세스를 진행합니다.
+        Returns TokenAuthenticationFailed when access_token is invalid.
+        social_uuid is a unique identifier used for signup and login.
+        If is_new is True, proceed with social signup flow.
+        If is_new is False, proceed with existing social sign-in flow.
         
-        google은 queryParameter로 오는 code, apple은 identityToken을 access_token으로 사용합니다.
+        For Google, use the code received via query parameter.
+        For Apple, use identityToken as access_token.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: UserSocialCheckResponseSerializer},
@@ -704,14 +705,14 @@ class UserSocialSignupAPIView(GenericAPIView):
     serializer_class = UserSocialSignupSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="소셜 로그인 신규 가입",
+        operation_summary="Social login signup",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        이메일 신규 가입과 거의 동일한 로직을 사용합니다.
-        이메일과 비밀번호 대신 social_uuid와 access_token을 사용합니다.
-        해당 이메일이 이미 다른 계정으로 등록되어 있으면 AlreadyEnrolledEmail 에러가 발생합니다.
+        Uses nearly the same flow as email signup.
+        Uses social_uuid and access_token instead of email/password.
+        Raises AlreadyEnrolledEmail if the email is already used by another account.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: UserSignupLoginResponseSerializer},
@@ -751,12 +752,12 @@ class UserSocialSigninAPIView(GenericAPIView):
     serializer_class = UserSocialSigninSerializer
 
     @custom_swagger_auto_schema(
-        operation_summary="소셜 로그인(기존 회원)",
+        operation_summary="Social login (existing user)",
         operation_description="""
-        ### 인증 및 권한
+        ### Authentication and Authorization
         1. api-key
         ---
-        검증된 소셜 로그인 정보를 바탕으로 로그인합니다.
+        Signs in with validated social login information.
         """,
         responses=get_swagger_response_dict(
             success_response={status.HTTP_200_OK: UserSignupLoginResponseSerializer},

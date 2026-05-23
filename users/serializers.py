@@ -10,12 +10,12 @@ from utils.serializers import ModelUpdateSerializer
 class UserEmailLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(
         required=True,
-        help_text="사용자 로그인 ID용 이메일",
+        help_text="Email used as login ID",
     )
     password = serializers.RegexField(
         regex=PASSWORD_REGEX,
         min_length=8,
-        help_text=f"다음 정규식을 따른다. {PASSWORD_REGEX}",
+        help_text=f"Must match the following regex: {PASSWORD_REGEX}",
     )
 
     def validate_email(self, value):
@@ -28,12 +28,12 @@ class UserEmailLoginSerializer(serializers.Serializer):
 class UserEmailSignupSerializer(serializers.Serializer):
     email = serializers.EmailField(
         required=True,
-        help_text="사용자 로그인 ID용 이메일",
+        help_text="Email used as login ID",
     )
     password = serializers.RegexField(
         regex=PASSWORD_REGEX,
         min_length=8,
-        help_text=f"다음 정규식을 따른다. {PASSWORD_REGEX}",
+        help_text=f"Must match the following regex: {PASSWORD_REGEX}",
     )
     name = serializers.CharField()
     user_tag = serializers.CharField()

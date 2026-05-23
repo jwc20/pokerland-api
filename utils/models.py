@@ -10,14 +10,14 @@ User = get_user_model()
 
 
 class CommentModelMixin(models.Model):
-    """댓글 모델 Mixin"""
+    """Comment model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_deleted = models.BooleanField("삭제 여부", default=False)
-    body = models.TextField("본문", blank=True, default=None, null=True)
+    is_deleted = models.BooleanField("Deleted", default=False)
+    body = models.TextField("Body", blank=True, default=None, null=True)
     replied_cnt = models.PositiveIntegerField(default=0)
-    like_cnt = models.PositiveIntegerField("좋아요 수", default=0)
+    like_cnt = models.PositiveIntegerField("Like count", default=0)
 
     @cached_property
     def user_tag(self):
@@ -36,7 +36,7 @@ class CommentModelMixin(models.Model):
 
 
 class CommentLikeModelMixin(models.Model):
-    """댓글 좋아요 모델 Mixin"""
+    """Comment like model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -47,13 +47,13 @@ class CommentLikeModelMixin(models.Model):
 
 
 class CommentReplyModelMixin(models.Model):
-    """댓글 대댓글 모델 Mixin"""
+    """Comment reply model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_deleted = models.BooleanField("삭제 여부", default=False)
-    body = models.TextField("본문", blank=True, default=None, null=True)
-    like_cnt = models.PositiveIntegerField("좋아요 수", default=0)
+    is_deleted = models.BooleanField("Deleted", default=False)
+    body = models.TextField("Body", blank=True, default=None, null=True)
+    like_cnt = models.PositiveIntegerField("Like count", default=0)
 
     @cached_property
     def user_tag(self):
@@ -72,7 +72,7 @@ class CommentReplyModelMixin(models.Model):
 
 
 class CommentReplyLikeModelMixin(models.Model):
-    """댓글 대댓글 좋아요 모델 Mixin"""
+    """Comment reply like model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -85,9 +85,9 @@ class CommentReplyLikeModelMixin(models.Model):
 class ImageModelMixin(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sort_order = models.PositiveSmallIntegerField(default=0)
-    original_image_url = models.URLField("원본 이미지 url", max_length=2048)
-    is_deleted = models.BooleanField("삭제 여부", default=False)
-    is_public = models.BooleanField("공개 이미지 여부", default=False)
+    original_image_url = models.URLField("Original image URL", max_length=2048)
+    is_deleted = models.BooleanField("Deleted", default=False)
+    is_public = models.BooleanField("Public image", default=False)
 
     @cached_property
     def signed_original_image_url(self):
@@ -102,12 +102,12 @@ class ImageModelMixin(models.Model):
 class AudioModelMixin(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sort_order = models.PositiveSmallIntegerField(default=0)
-    original_audio_url = models.URLField("원본 오디오 url", max_length=2048)
+    original_audio_url = models.URLField("Original audio URL", max_length=2048)
     duration = models.CharField(
-        "오디오 재생시간(초)", null=True, blank=True, default=None
+        "Audio duration (seconds)", null=True, blank=True, default=None
     )
-    is_deleted = models.BooleanField("삭제 여부", default=False)
-    # 오디오는 항상 private이므로 is_public 필드 불필요
+    is_deleted = models.BooleanField("Deleted", default=False)
+    # Audio is always private, so an is_public field is unnecessary.
 
     @cached_property
     def signed_original_audio_url(self):
@@ -118,7 +118,7 @@ class AudioModelMixin(models.Model):
 
 
 class BookmarkModelMixin(models.Model):
-    """즐겨찾기 모델 Mixin"""
+    """Bookmark model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -129,7 +129,7 @@ class BookmarkModelMixin(models.Model):
 
 
 class LikeModelMixin(models.Model):
-    """좋아요 모델 Mixin"""
+    """Like model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -140,11 +140,11 @@ class LikeModelMixin(models.Model):
 
 
 class ReportModelMixin(models.Model):
-    """신고 모델 Mixin"""
+    """Report model mixin."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    reason = models.TextField("신고사유", default=None, null=True, blank=True)
+    reason = models.TextField("Report reason", default=None, null=True, blank=True)
 
     class Meta:
         abstract = True

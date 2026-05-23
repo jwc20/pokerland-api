@@ -26,31 +26,31 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser):
-    """사용자 모델, 권한 상관 없이 가질수 있는 기본 데이터"""
+    """User model with base profile fields regardless of role."""
 
     email = models.EmailField(unique=True)
-    profile_name = models.CharField("프로필 이름", max_length=100, db_index=True)
-    username = models.CharField("프로필 태그", max_length=100, db_index=True)
+    profile_name = models.CharField("Profile name", max_length=100, db_index=True)
+    username = models.CharField("Profile tag", max_length=100, db_index=True)
     username_changed_at = models.DateTimeField(
-        "프로필 태그 변경 일시", default=timezone.now
+        "Profile tag changed at", default=timezone.now
     )
-    bio = models.CharField("한줄 소개", max_length=255, default="")
+    bio = models.CharField("Bio", max_length=255, default="")
     profile_image_url = models.URLField(
-        "프로필 이미지 URL", default=None, null=True, blank=True, max_length=2048
+        "Profile image URL", default=None, null=True, blank=True, max_length=2048
     )
-    is_active = models.BooleanField("활성 사용자 여부", default=True)
-    date_joined = models.DateTimeField("회원 가입 일시", default=timezone.now)
-    last_login = models.DateTimeField("마지막 로그인 일시", auto_now=True)
+    is_active = models.BooleanField("Is active", default=True)
+    date_joined = models.DateTimeField("Joined at", default=timezone.now)
+    last_login = models.DateTimeField("Last login at", auto_now=True)
     password_changed_at = models.DateTimeField(
-        "비밀번호 변경 일시", default=timezone.now
+        "Password changed at", default=timezone.now
     )
     deletion_requested_at = models.DateTimeField(
-        "계정 삭제 요청 일시", null=True, blank=True
+        "Deletion requested at", null=True, blank=True
     )
 
-    is_superuser = models.BooleanField("시스템 관리자 여부", default=False)
-    is_staff = models.BooleanField("운영자 여부", default=False)
-    is_customer = models.BooleanField("고객 여부", default=True)
+    is_superuser = models.BooleanField("Is system admin", default=False)
+    is_staff = models.BooleanField("Is staff", default=False)
+    is_customer = models.BooleanField("Is customer", default=True)
 
     USERNAME_FIELD = "email"
 
@@ -87,7 +87,7 @@ class ConfirmEmail(TimeStampedModel):
     """Email Confirm Model"""
 
     email = models.EmailField()
-    confirm_code = models.CharField("인증코드", max_length=6)
+    confirm_code = models.CharField("Verification code", max_length=6)
     is_confirmed = models.BooleanField(default=False)
 
 
@@ -97,7 +97,7 @@ class SocialLoginIdentifier(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     provider = models.CharField(
-        "소셜 로그인 제공자", max_length=10, choices=SocialLoginProviderChoices
+        "Social login provider", max_length=10, choices=SocialLoginProviderChoices
     )
     identifier = models.CharField(max_length=255)
     temp_access_token = models.CharField(max_length=255)

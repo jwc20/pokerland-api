@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.hashes import SHA512
 
 
 def create_token_string():
-    # django-rest-knox 에서 AUTH_TOKEN_CHARACTER_LENGTH 기본값으로 지정되어 있던 64 사용
+    # Use 64, matching django-rest-knox's default AUTH_TOKEN_CHARACTER_LENGTH.
     return binascii.hexlify(generate_bytes(int(64 / 2))).decode()
 
 

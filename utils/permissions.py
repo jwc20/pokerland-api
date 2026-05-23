@@ -40,16 +40,16 @@ class SwaggerDocumentPermission(BasePermission):
 
 
 class ChannelSubscriberPermission(BasePermission):
-    """채널 구독자 권한"""
+    """Channel subscriber permission."""
 
     def has_permission(self, request, view):
-        # TODO - 채널 권한 있는 사용자에 대해 권한 체크
+        # TODO - Add permission checks for users with channel access rights.
 
         return True
 
 
 class ChannelAdminPermission(BasePermission):
-    """채널 관리자 권한"""
+    """Channel admin permission."""
 
     def has_permission(self, request, view):
         return True

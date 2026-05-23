@@ -12,14 +12,14 @@ from django.utils import timezone
 
 def upload_to_s3(file_obj, bucket_name, s3_key):
     """
-    파일을 S3에 업로드합니다.
+    Upload file(s) to S3.
 
     Args:
-        file_obj: 업로드할 파일 객체 (단일 파일 객체 또는 {key: file_obj} 형태의 딕셔너리)
-        bucket_name: S3 버킷 이름
-        s3_key: S3에 저장될 파일 경로/이름 (또는 딕셔너리인 경우 기본 경로)
+        file_obj: File object to upload (single file or {key: file_obj} dictionary)
+        bucket_name: S3 bucket name
+        s3_key: Target S3 path/name (or base path for dictionary input)
     Returns:
-        str 또는 dict: 업로드된 파일의 URL 또는 URLs 딕셔너리
+        str or dict: Uploaded file key or dictionary of uploaded file keys
     """
     if settings.ENV == "local":
         session = boto3.Session(profile_name="essentory")
@@ -28,7 +28,7 @@ def upload_to_s3(file_obj, bucket_name, s3_key):
 
     s3_client = session.client("s3")
 
-    # 여러 파일 처리 (딕셔너리 형태)
+    # Handle multiple files (dictionary input)
     if isinstance(file_obj, dict):
         results = {}
         for key, file in file_obj.items():
@@ -52,7 +52,7 @@ def upload_to_s3(file_obj, bucket_name, s3_key):
                 import traceback
                 traceback.print_exc()
         return results
-    # 단일 파일 처리
+    # Handle single file
     else:
         try:
             # Reset file pointer and read file content
@@ -106,28 +106,28 @@ class CloudfrontHandler:
 
 def send_email(sender, recipient, subject, body_text, body_html=None):
     """
-    AWS SES를 사용하여 이메일을 전송하는 함수
+    Send an email via AWS SES.
 
     Parameters:
-    - sender: 발신자 이메일 주소
-    - recipient: 수신자 이메일 주소 (단일 문자열 또는 리스트)
-    - subject: 이메일 제목
-    - body_text: 이메일 본문 (텍스트)
-    - body_html: 이메일 본문 (HTML, 선택사항)
+    - sender: Sender email address
+    - recipient: Recipient email address (single string or list)
+    - subject: Email subject
+    - body_text: Email body (text)
+    - body_html: Email body (HTML, optional)
 
     Returns:
-    - 성공 시 True, 실패 시 False
+    - True on success, False on failure
     """
-    # SES 클라이언트 생성
+    # Create SES client
     client = boto3.client("ses")
 
-    # 이메일 내용 구성
+    # Build email payload
     email_message = {
         "Subject": {"Data": subject, "Charset": "UTF-8"},
         "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
     }
 
-    # HTML 본문이 제공된 경우 추가
+    # Add HTML body when provided
     if body_html:
         email_message["Body"]["Html"] = {"Data": body_html, "Charset": "UTF-8"}
     client.send_email(
@@ -140,6 +140,6 @@ def send_email(sender, recipient, subject, body_text, body_html=None):
 
 @lru_cache(maxsize=1)
 def is_running_on_lambda():
-    # Lambda 환경에만 존재하는 환경 변수 확인
+    # Check an environment variable that exists only in Lambda.
     import os
-    return 'AWS_LAMBDA_FUNCTION_NAME' in os.environ
+    return "AWS_LAMBDA_FUNCTION_NAME" in os.environ

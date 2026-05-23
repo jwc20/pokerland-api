@@ -23,7 +23,7 @@ from .views import (
 )
 
 urlpatterns = [
-    # 사용자 공통 api
+    # Common user APIs
     path(
         "user/my_profile",
         MyProfileAPIView.as_view(),
@@ -50,7 +50,7 @@ urlpatterns = [
         UserLogoutAPIView.as_view(),
         name="user-logout",
     ),
-    # TODO - 아래 2개 api 에 대해서 테스트 코드 작성
+    # TODO - Add tests for the two APIs below
     path(
         "user/signup/email/send_confirm_code",
         UserEmailSendConfirmCodeAPIView.as_view(),
@@ -61,7 +61,7 @@ urlpatterns = [
         UserEmailCheckConfirmCodeAPIView.as_view(),
         name="user-signup-email-check-confirm-code",
     ),
-    # 고객용 api
+    # Customer APIs
     path(
         "user/signup/email",
         UserEmailSignupAPIView.as_view(),
@@ -92,7 +92,7 @@ urlpatterns = [
         UserRecoverAccountAPIView.as_view(),
         name="user-recover-account",
     ),
-    # 회원가입 관련 가용성 검증 API
+    # Signup-related availability check APIs
     path(
         "user/signup/check_email",
         UserEmailAvailabilityAPIView.as_view(),

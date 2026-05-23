@@ -9,7 +9,7 @@ class ApiPaginationSerializer(serializers.Serializer):
 
 class ModelUpdateSerializer(serializers.ModelSerializer):
     """
-    update 요청의 경우 모든 필드를 required=False, allow_blank=True 로 처리
+    For update requests, treat all fields as required=False and allow_blank=True.
     """
 
     def __init__(self, *args, **kwargs):

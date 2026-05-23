@@ -15,14 +15,14 @@ from ..models import Customer
 
 
 class CustomerEmailLoginAPIViewTest(TestCase):
-    def test_정상(self):
-        # 데이터 생성
+    def test_success(self):
+        # Create test data
         customer = CustomerFactory()
         raw_password = "DummyPassword1!"
         customer.set_password(raw_password)
         customer.save()
 
-        # 호출
+        # Execute request
         response = APIClient().post(
             "/user/login/email",
             {
@@ -33,22 +33,22 @@ class CustomerEmailLoginAPIViewTest(TestCase):
             HTTP_app_version="1.0.1",
         )
 
-        # 검증
+        # Assert
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_user_data = response.json().get("user")
         self.assertEqual(response_user_data.get("email"), customer.email)
         self.assertFalse(response_user_data.get("is_creator"))
         self.assertFalse(response_user_data.get("is_staff"))
 
-    def test_비밀번호_틀림(self):
-        # 데이터 생성
+    def test_wrong_password(self):
+        # Create test data
         customer = CustomerFactory()
         raw_password = "DummyPassword1!"
         customer.set_password(raw_password)
         customer.save()
         wrong_password = f"wrong{raw_password}"
 
-        # 호출
+        # Execute request
         response = APIClient().post(
             "/user/login/email",
             {
@@ -59,16 +59,16 @@ class CustomerEmailLoginAPIViewTest(TestCase):
             HTTP_app_version="1.0.1",
         )
 
-        # 검증
+        # Assert
         self.assertEqual(response.status_code, InvalidLoginInfo.status_code)
         self.assertEqual(response.json().get("detail"), InvalidLoginInfo.default_detail)
 
 
 class CustomerEmailSignupAPIViewTestCase(TestCase):
-    def test_정상(self):
+    def test_success(self):
         email = "test1@dummy.com"
         password = "RawPassword1!"
-        profile_name = "홍길동"
+        profile_name = "John Doe"
         username = "@honggildong33"
         bio = ""
         is_ad_agreed = True
@@ -103,7 +103,7 @@ class CustomerEmailSignupAPIViewTestCase(TestCase):
 
 
 class MyProfileAPIViewTestCase(TestCase):
-    def test_정상(self):
+    def test_success(self):
         user = CustomerFactory()
         token_value, _ = CreateToken(user=user).create()
         with self.assertNumQueries(8):
@@ -118,9 +118,9 @@ class MyProfileAPIViewTestCase(TestCase):
 
 
 class MyProfileUpdateAPIViewTestCase(TestCase):
-    def test_정상(self):
+    def test_success(self):
         user = CustomerFactory()
-        profile_name = "변경후 이름"
+        profile_name = "Updated Name"
         username = "@after_change"
         token_value, _ = CreateToken(user=user).create()
         response = APIClient().post(
@@ -141,13 +141,13 @@ class MyProfileUpdateAPIViewTestCase(TestCase):
 
 class AccountDeletionRecoveryTest(TestCase):
     def setUp(self):
-        # 테스트 사용자 생성
+        # Create test user
         self.customer = CustomerFactory()
         self.token_value, _ = CreateToken(user=self.customer).create()
         self.client = APIClient()
 
-    def test_계정_삭제_요청(self):
-        # 계정 삭제 요청
+    def test_request_account_deletion(self):
+        # Request account deletion
         response = self.client.post(
             "/user/delete_account",
             {},
@@ -156,33 +156,33 @@ class AccountDeletionRecoveryTest(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # 계정과 관련 데이터 확인
+        # Verify account and related data
         self.customer.refresh_from_db()
         self.assertFalse(self.customer.is_active)
         self.assertIsNotNone(self.customer.deletion_requested_at)
 
-        # 광고 동의 확인
+        # Verify ad agreement
         self.ad_agreement.refresh_from_db()
         self.assertFalse(self.ad_agreement.is_agreed)
 
-        # 야간 광고 동의 확인
+        # Verify nighttime ad agreement
         self.ad_night_agreement.refresh_from_db()
         self.assertFalse(self.ad_night_agreement.is_agreed)
 
-        # 크리에이터 링크 확인
+        # Verify creator link
         self.creator_link.refresh_from_db()
         self.assertTrue(self.creator_link.is_deleted)
 
-    def test_계정_복구_성공(self):
-        # 먼저 계정 삭제
+    def test_account_recovery_success(self):
+        # Delete account first
         self.customer.is_active = False
         self.customer.deletion_requested_at = timezone.now()
         self.customer.save()
 
-        # 새 토큰 생성 (삭제 시 기존 토큰이 모두 삭제됨)
+        # Create a new token (existing tokens are deleted at account deletion)
         new_token_value, _ = CreateToken(user=self.customer).create()
 
-        # 계정 복구 요청
+        # Request account recovery
         response = self.client.post(
             "/user/recover_account",
             {},
@@ -191,32 +191,32 @@ class AccountDeletionRecoveryTest(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # 계정 상태 확인
+        # Verify account status
         self.customer.refresh_from_db()
         self.assertTrue(self.customer.is_active)
         self.assertIsNone(self.customer.deletion_requested_at)
 
-    def test_계정_복구_만료(self):
-        # 31일 전에 삭제된 계정 설정
+    def test_account_recovery_expired(self):
+        # Set account as deleted 31 days ago
         self.customer.is_active = False
         self.customer.deletion_requested_at = timezone.now() - timedelta(days=31)
         self.customer.save()
 
-        # 새 토큰 생성
+        # Create a new token
         new_token_value, _ = CreateToken(user=self.customer).create()
 
-        # 계정 복구 요청 (실패해야 함)
+        # Request account recovery (should fail)
         response = self.client.post(
             "/user/recover_account",
             {},
             HTTP_TOKEN=new_token_value,
             HTTP_app_version="1.0.1",
         )
-        # is_active가 false이면 token이 생성되지 않음
+        # Token is not issued when is_active is False
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         # self.assertEqual(response.json()["detail"], "recovery_period_expired")
 
-        # 계정 상태 확인 (여전히 비활성 상태여야 함)
+        # Verify account state (should remain inactive)
         self.customer.refresh_from_db()
         self.assertFalse(self.customer.is_active)
         self.assertIsNotNone(self.customer.deletion_requested_at)

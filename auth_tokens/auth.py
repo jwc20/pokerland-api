@@ -22,12 +22,12 @@ User = get_user_model()
 
 class BaseTokenAuthenticationMixin:
     """
-    Django Rest Knox 의 TokenAuthentication 을 변형
-    주요 변경 사항
-    1. 별도의 settings 대신 django.conf 의 settings에서 주요 값을 가져오도록 설정
-    2. signal 패턴 제거
+    Customized version of Django Rest Knox TokenAuthentication.
+    Main changes:
+    1. Read key values from django.conf settings instead of separate settings.
+    2. Remove signal-based pattern.
 
-    - Django Rest Knox 의 TokenAuthentication 의 설명
+    - Description of Django Rest Knox TokenAuthentication
     This authentication scheme uses Knox AuthTokens for authentication.
 
     Similar to DRF's TokenAuthentication, it overrides a large amount of that
@@ -59,7 +59,7 @@ class BaseTokenAuthenticationMixin:
                     self._renew_token(auth_token)
                 return self._validate_user(
                     auth_token
-                )  # TODO: 계정 삭제 후 복구 기간이 만료되지 않은 유저도 토큰 인증을 할 수 없음
+                )  # TODO: Users pending deletion cannot authenticate even within recovery period.
         raise TokenAuthenticationFailed()
 
     def _renew_token(self, auth_token):
@@ -88,7 +88,7 @@ class BaseTokenAuthenticationMixin:
 
 class StrictTokenAuthentication(BaseTokenAuthenticationMixin, BaseAuthentication):
     """
-    로그인이 필수인 경우 사용하는 인증
+    Authentication for endpoints that require login.
     """
 
     def authenticate(self, request):
@@ -102,7 +102,7 @@ class StrictTokenAuthentication(BaseTokenAuthenticationMixin, BaseAuthentication
 
 class OptionalTokenAuthentication(BaseTokenAuthenticationMixin, BaseAuthentication):
     """
-    로그인이 필수가 아닌 경우 사용하는 인증
+    Authentication for endpoints where login is optional.
     """
 
     def authenticate(self, request):

@@ -38,9 +38,9 @@ from .social_auth import AppleAuthModule, GoogleAuthModule, SocialAuthModule
 
 class CustomerAccountHandler:
     """
-    일반 사용자(후원자)의 계정 관련 모듈
+    Account-related helper for general users (supporters).
 
-    기본적으로 모든 계정은 고객 권한을 가짐
+    By default, all accounts have customer permissions.
     """
 
     def __init__(self, **kwargs):
@@ -71,7 +71,7 @@ class CustomerAccountHandler:
         # is_prod = settings.ENV == "prod"
         # if is_prod:
         #     EmailService.send_template_email(
-        #         subject="Essentory 가입을 환영합니다",
+        #         subject="Welcome to Essentory",
         #         recipients=email,
         #         template_name="welcome",
         #         context={"profile_name": self.profile_name},
@@ -83,7 +83,7 @@ class CustomerAccountHandler:
         return user, {"token_value": token_value, "expiry": expiry}
 
     def login_id_duplicate_check(self):
-        # TODO - 탈퇴나 휴면은 어떻게할지 살짝 고민 필요
+        # TODO - Decide how withdrawn or dormant accounts should be handled.
         # Ensure email is lowercase and check case-insensitively
         email = self.email.lower() if self.email else None
         if User.objects.filter(login_id__iexact=email).exists():
@@ -93,8 +93,8 @@ class CustomerAccountHandler:
 
     def login(self):
         user = self._authenticate()
-        # 첫번째 토큰은 만료 시켜야 하나?
-        # 두번째 토큰 부터는 expiry 를 좀더 짧게주는게 어떨까?
+        # Should the first token be invalidated?
+        # Should later tokens have a shorter expiry?
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
@@ -113,17 +113,17 @@ class CustomerAccountHandler:
 
     def update_username(self, username):
         """
-        사용자의 프로필 태그(username)를 변경합니다.
-        31일 내에 한 번만 변경할 수 있습니다.
+        Change user's profile tag (username).
+        It can be changed only once within 31 days.
 
         Args:
-            username: 변경할 프로필 태그
+            username: Profile tag to change to
 
         Returns:
-            User: 업데이트된 사용자 객체
+            User: Updated user object
 
         Raises:
-            UserTagUpdateRestricted: 31일 내에 다시 태그를 변경하려고 할 때 발생
+            UserTagUpdateRestricted: Raised when changing tag again within 31 days
         """
         # Ensure username is lowercase for consistency
         if username:
@@ -168,7 +168,7 @@ class CustomerAccountHandler:
         self.user.authtoken_set.filter(token_key=token_value[:8]).delete()
 
     def find_email(self):
-        # TODO - 나중에 전화번호 데이터 및 찾기 로직 들어가면 완성하기
+        # TODO - Complete once phone-number data and lookup logic are added.
         pass
 
     def reset_password(self, new_password, email=None, language="ko"):
@@ -195,7 +195,7 @@ class CustomerAccountHandler:
         # is_prod = settings.ENV == "prod"
         # if is_prod:
         #     EmailService.send_template_email(
-        #         subject="Essentory 비밀번호가 변경되었습니다",
+        #         subject="Your Essentory Password Has Been Changed",
         #         recipients=user.email,
         #         template_name="password_changed",
         #         context={
@@ -286,7 +286,7 @@ class CustomerAccountHandler:
 
         # Send email with verification code
         template_name = "password_reset" if not is_signup else "verification_code"
-        subject = "비밀번호 재설정 코드" if not is_signup else "이메일 인증 코드"
+        subject = "Password reset code" if not is_signup else "Email verification code"
 
         # Prepare template context
         context = {
@@ -400,11 +400,11 @@ class CustomerAccountHandler:
     @transaction.atomic
     def delete_account(self):
         """
-        계정 삭제(탈퇴) 처리 - 30일의 복구 기간이 제공됩니다
+        Process account deletion (withdrawal) with a 30-day recovery period.
 
-        계정 삭제는 즉시 이루어지지 않고, 30일 동안 계정은 비활성화됩니다.
-        30일 이내에 계정을 복구할 수 있습니다.
-        30일 후에는 계정 삭제가 완료됩니다.
+        Deletion is not immediate; the account is deactivated for 30 days.
+        The account can be recovered within that period.
+        Deletion is finalized after 30 days.
 
         Returns:
             bool: True on successful deletion request
@@ -413,7 +413,7 @@ class CustomerAccountHandler:
             ValueError: If no user is provided
         """
         if not self.user:
-            raise ValueError("계정 삭제를 위해 사용자 정보가 필요합니다")
+            raise ValueError("User information is required to delete an account")
 
         # 1. Invalidate all auth tokens
         self.user.authtoken_set.all().delete()
@@ -435,7 +435,7 @@ class CustomerAccountHandler:
     @transaction.atomic
     def recover_account(self):
         """
-        삭제 요청된 계정 복구 (30일 이내)
+        Recover an account marked for deletion (within 30 days).
 
         Returns:
             bool: True on successful recovery
@@ -446,7 +446,7 @@ class CustomerAccountHandler:
             RecoveryPeriodExpired: If the 30-day recovery period has expired
         """
         if not self.user:
-            raise ValueError("계정 복구를 위해 사용자 정보가 필요합니다")
+            raise ValueError("User information is required to recover an account")
 
         # Check if the account is marked for deletion
         if not self.user.deletion_requested_at:
@@ -480,18 +480,18 @@ class SocialAuthHandler:
 
     def check(self, access_token):
         """
-        소셜 로그인 정보를 검증합니다
+        Validate social login information.
 
         Args:
-            access_token: 소셜 로그인 제공자에서 발급받은 액세스 토큰
+            access_token: Access token issued by the social login provider
 
         Returns:
-            social_uuid: 소셜 로그인 식별자
-            email: 소셜 로그인 이메일
-            is_new: 소셜 로그인 신규 가입 여부 (기존 이메일 계정이 있는 경우 해당 계정으로 로그인)
+            social_uuid: Social login identifier
+            email: Social login email
+            is_new: Whether this is a new social signup (or existing email login)
 
         Raises:
-            TokenAuthenticationFailed: 토큰이 유효하지 않은 경우
+            TokenAuthenticationFailed: If token is invalid
         """
         if self.provider == None:
             raise ValueError("provider not found")
@@ -571,7 +571,7 @@ class SocialAuthHandler:
         # is_prod = settings.ENV == "prod"
         # if is_prod:
         #     EmailService.send_template_email(
-        #         subject="Essentory 가입을 환영합니다",
+        #         subject="Welcome to Essentory",
         #         recipients=social_login_identifier.email,
         #         template_name="welcome",
         #         context={"profile_name": profile_name},

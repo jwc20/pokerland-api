@@ -26,15 +26,15 @@ class CacheConfig:
         )
 
 
-# 기본 TTL 설정
+# Default TTL settings
 CONTENT_LIST = CacheConfig(
     prefix="content_list",
-    ttl=60 * 1,  # 1분
+    ttl=60 * 1,  # 1 minute
     cache_key_info=OrderedDict([("channel_id", None), ("page", None)]),
 )
 COMMUNITY_POST_LIST = CacheConfig(
     prefix="community_post_list",
-    ttl=60 * 1,  # 1분
+    ttl=60 * 1,  # 1 minute
     cache_key_info=OrderedDict([("channel_id", None), ("page", None)]),
 )
 

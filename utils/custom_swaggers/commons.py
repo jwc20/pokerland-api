@@ -6,9 +6,9 @@ def get_swagger_response_dict(
     success_response=None,
 ) -> str:
     """
-    swagger_auto_schema 함수내 responses 인자를 만들어 swagger에서 잘 보이도록 해줌
-    :param api_exceptions: 해당 view에서 일어날 모든 exception의 List
-    :param success_response: 성공 응답 http 코드 및 응답시 사용할 Serializer 정보를 담은 dict
+    Build the responses argument for swagger_auto_schema so it renders clearly in Swagger.
+    :param api_exceptions: List of all exceptions that can occur in the view
+    :param success_response: Dict of success HTTP codes and response serializers
     :return:
     """
     if success_response:

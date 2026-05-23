@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 ("email", models.EmailField(max_length=254)),
                 (
                     "confirm_code",
-                    models.CharField(max_length=6, verbose_name="인증코드"),
+                    models.CharField(max_length=6, verbose_name="Verification code"),
                 ),
                 ("is_confirmed", models.BooleanField(default=False)),
             ],
@@ -68,26 +68,26 @@ class Migration(migrations.Migration):
                 (
                     "profile_name",
                     models.CharField(
-                        db_index=True, max_length=100, verbose_name="프로필 이름"
+                        db_index=True, max_length=100, verbose_name="Profile name"
                     ),
                 ),
                 (
                     "username",
                     models.CharField(
-                        db_index=True, max_length=100, verbose_name="프로필 태그"
+                        db_index=True, max_length=100, verbose_name="Profile tag"
                     ),
                 ),
                 (
                     "username_changed_at",
                     models.DateTimeField(
                         default=django.utils.timezone.now,
-                        verbose_name="프로필 태그 변경 일시",
+                        verbose_name="Profile tag changed at",
                     ),
                 ),
                 (
                     "bio",
                     models.CharField(
-                        default="", max_length=255, verbose_name="한줄 소개"
+                        default="", max_length=255, verbose_name="Bio"
                     ),
                 ),
                 (
@@ -97,51 +97,51 @@ class Migration(migrations.Migration):
                         default=None,
                         max_length=2048,
                         null=True,
-                        verbose_name="프로필 이미지 URL",
+                        verbose_name="Profile image URL",
                     ),
                 ),
                 (
                     "is_active",
-                    models.BooleanField(default=True, verbose_name="활성 사용자 여부"),
+                    models.BooleanField(default=True, verbose_name="Is active"),
                 ),
                 (
                     "date_joined",
                     models.DateTimeField(
-                        default=django.utils.timezone.now, verbose_name="회원 가입 일시"
+                        default=django.utils.timezone.now, verbose_name="Joined at"
                     ),
                 ),
                 (
                     "last_login",
                     models.DateTimeField(
-                        auto_now=True, verbose_name="마지막 로그인 일시"
+                        auto_now=True, verbose_name="Last login at"
                     ),
                 ),
                 (
                     "password_changed_at",
                     models.DateTimeField(
                         default=django.utils.timezone.now,
-                        verbose_name="비밀번호 변경 일시",
+                        verbose_name="Password changed at",
                     ),
                 ),
                 (
                     "deletion_requested_at",
                     models.DateTimeField(
-                        blank=True, null=True, verbose_name="계정 삭제 요청 일시"
+                        blank=True, null=True, verbose_name="Deletion requested at"
                     ),
                 ),
                 (
                     "is_superuser",
                     models.BooleanField(
-                        default=False, verbose_name="시스템 관리자 여부"
+                        default=False, verbose_name="Is system admin"
                     ),
                 ),
                 (
                     "is_staff",
-                    models.BooleanField(default=False, verbose_name="운영자 여부"),
+                    models.BooleanField(default=False, verbose_name="Is staff"),
                 ),
                 (
                     "is_customer",
-                    models.BooleanField(default=True, verbose_name="고객 여부"),
+                    models.BooleanField(default=True, verbose_name="Is customer"),
                 ),
             ],
             options={
@@ -178,9 +178,9 @@ class Migration(migrations.Migration):
                 (
                     "provider",
                     models.CharField(
-                        choices=[("google", "구글"), ("apple", "애플")],
+                        choices=[("google", "Google"), ("apple", "Apple")],
                         max_length=10,
-                        verbose_name="소셜 로그인 제공자",
+                        verbose_name="Social login provider",
                     ),
                 ),
                 ("identifier", models.CharField(max_length=255)),

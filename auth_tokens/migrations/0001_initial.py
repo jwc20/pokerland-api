@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
                     "token_key",
                     models.CharField(
                         db_index=True,
-                        help_text="db에 저장되는 token의 일부 값, DB가 탈취되어도 token을 알지 못하도록 일부만 저장",
+                        help_text="Partial token value stored in DB to avoid exposing full token if compromised.",
                         max_length=8,
                     ),
                 ),

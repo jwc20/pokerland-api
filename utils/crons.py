@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_url(session: aiohttp.ClientSession, url: str) -> None:
-    """단일 URL에 대한 GET 요청을 비동기적으로 수행"""
+    """Asynchronously perform a GET request for a single URL."""
     try:
         async with session.get(url) as response:
             await response.text()
@@ -27,33 +27,33 @@ async def keep_hot_async(
     concurrent_limit: int = 50,
 ) -> None:
     """
-    Lambda 함수를 웜업하기 위한 비동기 함수
+    Async helper for warming up a Lambda function.
 
     Args:
-        url: 호출할 API endpoint
-        num_requests: 총 요청 수
-        concurrent_limit: 동시에 처리할 최대 요청 수
+        url: API endpoint to call
+        num_requests: Total number of requests
+        concurrent_limit: Maximum number of concurrent requests
     """
     async with aiohttp.ClientSession() as session:
-        # URL 리스트 생성
+        # Create URL list
         urls = [url] * num_requests
 
-        # 동시성 제한을 위한 세마포어 생성
+        # Create semaphore for concurrency control
         semaphore = asyncio.Semaphore(concurrent_limit)
 
-        # 세마포어를 사용하는 래퍼 함수
+        # Wrapper function using the semaphore
         async def fetch_with_semaphore(url: str) -> None:
             async with semaphore:
                 await fetch_url(session, url)
 
-        # 시작 시간 기록
+        # Record start time
         start_time = time.time()
 
-        # 모든 요청을 동시에 실행
+        # Execute all requests concurrently
         tasks = [fetch_with_semaphore(url) for url in urls]
         await asyncio.gather(*tasks)
 
-        # 총 소요 시간 계산
+        # Calculate elapsed time
         elapsed_time = time.time() - start_time
         print(f"Completed {num_requests} requests in {elapsed_time:.2f} seconds")
 
@@ -69,38 +69,37 @@ def keep_hot_prod():
 # TODO: need testing
 def cleanup_deleted_accounts():
     """
-    30일이 지난 삭제 요청된 계정을 영구적으로 비활성화합니다.
-    삭제 요청된 계정 중 30일이 지난 계정은 더 이상 복구할 수 없습니다.
-    이 함수는 매일 자정에 실행되도록 예약됩니다.
+    Permanently deactivate accounts requested for deletion over 30 days ago.
+    Deleted accounts older than 30 days can no longer be recovered.
+    This function is scheduled to run daily at midnight.
 
     Returns:
-        int: 처리된 계정 수
+        int: Number of processed accounts
     """
-    # 30일 이전의 시간 계산
+    # Calculate timestamp from 30 days ago
     thirty_days_ago = timezone.now() - timedelta(days=30)
 
-    # 30일 이전에 삭제 요청된 계정 찾기
+    # Find accounts requested for deletion more than 30 days ago
     expired_accounts = User.objects.filter(
         deletion_requested_at__lt=thirty_days_ago, is_active=False
     )
 
-    # 영구적으로 계정 비활성화
+    # Permanently deactivate expired accounts
     count = expired_accounts.count()
     if count > 0:
         print(f"Permanently deactivating {count} expired accounts")
 
-    # deletion_requested_at 필드를 유지하여 복구 시도를 방지함
-    # 실제 레코드는 삭제하지 않고 영구적으로 비활성 상태로 유지
-    # 이 방식으로 사용자는 계정이 완전히 삭제되었다고 인식하지만
-    # 필요한 경우 관리자가 수동으로 복구할 수 있음
+    # Keep deletion_requested_at to prevent recovery attempts.
+    # Keep records instead of deleting so accounts remain permanently inactive.
+    # This behaves like full deletion to users while allowing admin restoration if needed.
     return count
 
 
 # TODO: need testing
 def run_subscription_validation():
     """
-    모든 활성 구독에 대해 유효성 검증을 실행합니다.
-    이 함수는 매일 자정에 실행되도록 예약됩니다.
+    Run validation for all active subscriptions.
+    This function is scheduled to run daily at midnight.
     """
     logger.info("Triggering subscription validation job")
     validate_all_subscriptions()

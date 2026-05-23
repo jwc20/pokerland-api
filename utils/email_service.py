@@ -210,13 +210,13 @@ class EmailService:
             
             # Adjust subject based on language
             localized_subject = subject
-            if language == 'en' and subject == "Essentory 가입을 환영합니다":
+            if language == 'en' and subject == "Welcome to Essentory":
                 localized_subject = "Welcome to Essentory"
-            elif language == 'en' and subject == "Essentory 비밀번호가 변경되었습니다":
+            elif language == 'en' and subject == "Your Essentory Password Has Been Changed":
                 localized_subject = "Your Essentory Password Has Been Changed"
-            elif language == 'en' and subject == "비밀번호 재설정 코드":
+            elif language == 'en' and subject == "Password reset code":
                 localized_subject = "Password Reset Code"
-            elif language == 'en' and subject == "이메일 인증 코드":
+            elif language == 'en' and subject == "Email verification code":
                 localized_subject = "Email Verification Code"
             
             return EmailService.send_email(

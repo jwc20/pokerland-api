@@ -33,7 +33,7 @@ class GoogleAuthModule(SocialAuthModule):
         return user_info.get("uid"), user_info.get("email")
 
     def withdrawal(self, user_identifier):
-        """구글 로그인은 탈퇴 로직 없음"""
+        """Google login has no withdrawal logic."""
         pass
 
     def _get_google_user_info(self, access_token):
@@ -99,24 +99,24 @@ class AppleAuthModule(SocialAuthModule):
         try:
             decoded = jwt.decode(
                 identity_token,
-                "",  # 애플 공개키로 검증하므로 빈 문자열 사용
+                "",  # Use an empty string because verification uses Apple's public key.
                 options={
-                    "verify_signature": False,  # 서명 확인 건너뛰기
+                    "verify_signature": False,  # Skip signature verification.
                     "verify_aud": False,  # TODO
                 },
-                # audience=settings.IOS_BUNDLE_ID,  # 환경변수에서 가져온 bundle_id 사용
+                # audience=settings.IOS_BUNDLE_ID,  # Use bundle_id from environment variable.
             )
             return decoded
         except Exception as e:
             return None
 
     def revoke_apple_token(self, user_identifier: str):
-        """애플 계정 연동 해제"""
+        """Revoke Apple account linkage."""
         try:
-            # 클라이언트 시크릿 생성
+            # Generate client secret
             client_secret = self._create_client_secret()
 
-            # Apple 토큰 철회 엔드포인트
+            # Apple token revocation endpoint
             url = "https://appleid.apple.com/auth/revoke"
 
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -124,14 +124,14 @@ class AppleAuthModule(SocialAuthModule):
             data = {
                 "client_id": settings.APPLE_BUNDLE_ID,
                 "client_secret": client_secret,
-                "token": user_identifier,  # 사용자의 identifier (sub 값)
+                "token": user_identifier,  # User identifier (sub claim)
                 "token_type_hint": "access_token",
             }
 
             response = requests.post(url, headers=headers, data=data)
 
             if response.status_code == 200:
-                # 성공적으로 철회된 경우 사용자 삭제
+                # Token revoked successfully
                 return True
             return False
 
@@ -140,9 +140,9 @@ class AppleAuthModule(SocialAuthModule):
             return False
 
     def _create_client_secret(self):
-        """Apple Client Secret 생성"""
+        """Create Apple client secret."""
         now = timezone.now()
-        exp_time = now + timedelta(days=180)  # 180일 유효기간
+        exp_time = now + timedelta(days=180)  # Valid for 180 days.
 
         headers = {"kid": settings.APPLE_SUBSCRIPTION_KEY_ID, "alg": "ES256"}
 
@@ -154,7 +154,7 @@ class AppleAuthModule(SocialAuthModule):
             "sub": settings.IOS_BUNDLE_ID,
         }
 
-        # JWT 토큰 생성
+        # Create JWT token
         client_secret = jwt.encode(
             payload, settings.APPLE_PRIVATE_KEY, algorithm="ES256", headers=headers
         )

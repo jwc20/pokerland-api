@@ -26,7 +26,7 @@ class AuthTokenManager(models.Manager):
 
 
 class AuthToken(models.Model):
-    """인증 토큰"""
+    """Authentication token."""
 
     objects = AuthTokenManager()
 
@@ -34,7 +34,7 @@ class AuthToken(models.Model):
     token_key = models.CharField(
         max_length=8,
         db_index=True,
-        help_text="db에 저장되는 token의 일부 값, DB가 탈취되어도 token을 알지 못하도록 일부만 저장",
+        help_text="Partial token value stored in DB to avoid exposing full token if compromised.",
     )
     user = models.ForeignKey(
         User,
@@ -45,7 +45,7 @@ class AuthToken(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     expiry = models.DateTimeField(null=True, blank=True)
 
-    # TODO - 마지막 업데이트 시각 넣기
+    # TODO - Add last-updated timestamp.
 
     def __str__(self):
         return "%s : %s" % (self.digest, self.user)

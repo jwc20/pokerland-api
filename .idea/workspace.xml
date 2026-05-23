@@ -13,7 +13,7 @@
   <component name="CopilotChats">
     <option name="panelChat">
       <chat>
-        <option name="activeSessionId" value="d0fedc53-0926-4cd7-bbc0-d3047823d1e3" />
+        <option name="activeSessionId" value="ba113d10-c4d6-487c-838f-d4f4b3249c6d" />
         <option name="sessions">
           <session>
             <option name="chatType" value="PANEL" />
@@ -32,6 +32,24 @@
             <option name="modelValue" value="auto" />
             <option name="targetType" value="LOCAL" />
           </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="02a1bba0-463c-44b3-bb61-867cbf0e5e30" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Stopped" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="ba113d10-c4d6-487c-838f-d4f4b3249c6d" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Completed" />
+            <option name="targetType" value="LOCAL" />
+          </session>
         </option>
         <option name="type" value="PANEL" />
       </chat>
@@ -44,8 +62,8 @@
   </component>
   <component name="CopilotUserSelectedModel">
     <selectedModels>
-      <entry key="agent-panel" value="Claude Sonnet 4.6" />
-      <entry key="chat-panel" value="Claude Sonnet 4.6" />
+      <entry key="agent-panel" value="Auto" />
+      <entry key="chat-panel" value="Auto" />
     </selectedModels>
   </component>
   <component name="FileTemplateManagerImpl">
@@ -73,7 +91,7 @@
         <option name="model">
           <model>
             <option name="modelType" value="builtin_family" />
-            <option name="modelValue" value="claude-sonnet-4.6" />
+            <option name="modelValue" value="auto" />
           </model>
         </option>
         <option name="targetType" value="LOCAL" />
