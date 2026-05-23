@@ -24,9 +24,9 @@ schema_view = get_schema_view(
     openapi.Info(
         title=f"[{settings.ENV}] Pokerland API",
         default_version=settings.ALLOWED_VERSIONS[-1],
-        description=f"""
-# SWAGGER document auto-generated via the drf-yasg library.
-""",
+        description="""
+        # SWAGGER document auto-generated via the drf-yasg library.
+        """,
     ),
     public=True,
     permission_classes=(SwaggerDocumentPermission,),
