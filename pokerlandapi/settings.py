@@ -1,4 +1,7 @@
+from datetime import timedelta
 from pathlib import Path
+
+from rest_framework.settings import api_settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",
     # third-party
     "rest_framework",
     "drf_spectacular",
@@ -31,12 +35,6 @@ INSTALLED_APPS = [
     "auth_tokens",
 ]
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "knox.auth.TokenAuthentication",
-    ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -100,31 +98,72 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
+# Rest Framework
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
+    "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.AcceptHeaderVersioning",
+    # "DEFAULT_PAGINATION_CLASS": "utils.paginations.ApiPageNumberPagination",
+    "DEFAULT_AUTHENTICATION_CLASS": [
+        "rest_framework.authentication.SessionAuthentication",
+        "auth_tokens.auth.TokenAuthentication",
+    ],
+    "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+    "DATE_FORMAT": "%Y-%m-%d",
+}
+
+# drf-spectacular swagger settings
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Pokerland API",
+    "DESCRIPTION": "Your API documentation",
+    "VERSION": "1.0.0",
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "api-key": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "api-key",
+            },
+            "app-version": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "app-version",
+            },
+            "Token": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "TOKEN",
+            },
+        }
+    },
+    "SECURITY": [
+        {"api-key": []},
+        {"app-version": []},
+        {"Token": []},
+    ],
+    # Similar idea to USE_SESSION_AUTH=False:
+    # hide SessionAuthentication / BasicAuthentication from the generated schema
+    "AUTHENTICATION_WHITELIST": [],
+}
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
 STATIC_URL = "static/"
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Pokerland API",
-    "DESCRIPTION": "Your project description",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
-    # OTHER SETTINGS
+AUTH_TOKEN_SETTING = {
+    # Since the primary users are app users, the token validity period has been set to a relatively long 30 days.
+    "TOKEN_TTL": timedelta(days=30),
+    "USER_SERIALIZER": None,
+    "TOKEN_LIMIT_PER_USER": None,
+    "AUTO_REFRESH": True,
+    # The token expiration time is extended on a daily basis.
+    "MIN_REFRESH_INTERVAL_SECOND": 60 * 60 * 24,
+    "AUTH_HEADER_PREFIX": "TOKEN",
+    "EXPIRY_DATETIME_FORMAT": api_settings.DATETIME_FORMAT,
 }
