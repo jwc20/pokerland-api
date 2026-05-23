@@ -26,7 +26,7 @@ class AppVersionMiddleware(MiddlewareMixin):
             return
         if settings.ENV_NAME_CHECK_URL in request.resolver_match.route:
             return
-        if "essentory_swagger" in request.resolver_match.route:
+        if "pokerland_swagger" in request.resolver_match.route:
             return
 
         # minimum_version = self._get_minimum_app_version(request.os_type)

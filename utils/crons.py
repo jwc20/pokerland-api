@@ -1,6 +1,6 @@
 import asyncio
-import time
 import logging
+import time
 from datetime import timedelta
 
 import aiohttp
@@ -59,11 +59,11 @@ async def keep_hot_async(
 
 
 def keep_hot_dev():
-    asyncio.run(keep_hot_async(url="https://api-dev.essentory.net/env_name"))
+    asyncio.run(keep_hot_async(url="https://api-dev.pokerland.net/env_name"))
 
 
 def keep_hot_prod():
-    asyncio.run(keep_hot_async(url="https://api-prod.essentory.net/env_name"))
+    asyncio.run(keep_hot_async(url="https://api-prod.pokerland.net/env_name"))
 
 
 # TODO: need testing
@@ -132,9 +132,10 @@ def send_scheduled_content_notifications():
     Send notifications for contents that are scheduled to be published.
     This function is called by a cron job every 5 minutes.
     """
-    from django.utils import timezone
     from datetime import timedelta
+
     from contents.models import Content
+    from django.utils import timezone
     from notifications.utils import UnifiedNotificationService
 
     print("Starting scheduled content notifications check")

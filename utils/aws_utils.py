@@ -22,7 +22,7 @@ def upload_to_s3(file_obj, bucket_name, s3_key):
         str or dict: Uploaded file key or dictionary of uploaded file keys
     """
     if settings.ENV == "local":
-        session = boto3.Session(profile_name="essentory")
+        session = boto3.Session(profile_name="pokerland")
     else:
         session = boto3.Session()
 

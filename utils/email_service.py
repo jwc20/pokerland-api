@@ -17,7 +17,9 @@ from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
+
 from utils.aws_utils import is_running_on_lambda
+
 logger = logging.getLogger(__name__)
 
 
@@ -210,10 +212,10 @@ class EmailService:
             
             # Adjust subject based on language
             localized_subject = subject
-            if language == 'en' and subject == "Welcome to Essentory":
-                localized_subject = "Welcome to Essentory"
-            elif language == 'en' and subject == "Your Essentory Password Has Been Changed":
-                localized_subject = "Your Essentory Password Has Been Changed"
+            if language == 'en' and subject == "Welcome to Pokerland":
+                localized_subject = "Welcome to Pokerland"
+            elif language == 'en' and subject == "Your Pokerland Password Has Been Changed":
+                localized_subject = "Your Pokerland Password Has Been Changed"
             elif language == 'en' and subject == "Password reset code":
                 localized_subject = "Password Reset Code"
             elif language == 'en' and subject == "Email verification code":

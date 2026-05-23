@@ -22,7 +22,7 @@ from utils.permissions import ApiPermission, SwaggerDocumentPermission
 
 schema_view = get_schema_view(
     openapi.Info(
-        title=f"[{settings.ENV}] Essentory API",
+        title=f"[{settings.ENV}] Pokerland API",
         default_version=settings.ALLOWED_VERSIONS[-1],
         description=f"""
 # SWAGGER document auto-generated via the drf-yasg library.
