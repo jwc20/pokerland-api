@@ -13,7 +13,9 @@ SECRET_KEY = "django-insecure-0@%6ofi@er%=@4k25%lscf)w&isq*1%$sp4hhb@^4i9$#%b+7e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "*",
+]
 
 
 # Application definition
@@ -28,7 +30,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     # third-party
     "rest_framework",
-    "drf_spectacular",
+    "drf_yasg",
     "corsheaders",
     # custom apps
     "users",
@@ -116,39 +118,18 @@ REST_FRAMEWORK = {
     "DATE_FORMAT": "%Y-%m-%d",
 }
 
-# drf-spectacular swagger settings
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Pokerland API",
-    "DESCRIPTION": "Your API documentation",
-    "VERSION": "1.0.0",
-    "APPEND_COMPONENTS": {
-        "securitySchemes": {
-            "api-key": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "api-key",
-            },
-            "app-version": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "app-version",
-            },
-            "Token": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "TOKEN",
-            },
-        }
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "api-key": {"type": "apiKey", "name": "api-key", "in": "header"},
+        # "app-version": {"type": "apiKey", "name": "app-version", "in": "header"},
+        "Token": {"type": "apiKey", "name": "TOKEN", "in": "header"},
     },
-    "SECURITY": [
-        {"api-key": []},
-        {"app-version": []},
-        {"Token": []},
+    "USE_SESSION_AUTH": False,
+    "DEFAULT_PAGINATOR_INSPECTORS": [
+        "utils.custom_swaggers.paginations.CustomDjangoRestResponsePagination",
     ],
-    # Similar idea to USE_SESSION_AUTH=False:
-    # hide SessionAuthentication / BasicAuthentication from the generated schema
-    "AUTHENTICATION_WHITELIST": [],
 }
+
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
@@ -167,3 +148,16 @@ AUTH_TOKEN_SETTING = {
     "AUTH_HEADER_PREFIX": "TOKEN",
     "EXPIRY_DATETIME_FORMAT": api_settings.DATETIME_FORMAT,
 }
+
+DEFAULT_PAGE_SIZE = 50
+EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES = 3
+USE_IN_LOCAL = True
+
+ALLOWED_IP_ADDRESSES = [
+    "*",
+]
+
+ENV = "local"
+ALLOWED_VERSIONS = [
+    "*",
+]

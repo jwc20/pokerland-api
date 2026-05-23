@@ -3,16 +3,11 @@ from factory.django import DjangoModelFactory
 from faker import Faker
 
 from .models import (
-    AdAgreement,
-    AdNightAgreement,
-    Creator,
-    CreatorLink,
     Customer,
     User,
-    UserBlock,
 )
 
-fake = Faker("ko_KR")
+fake = Faker("en_US")
 
 
 class UserFactory(DjangoModelFactory):
@@ -28,42 +23,12 @@ class CustomerFactory(UserFactory):
     class Meta:
         model = Customer
 
-    is_creator = False
     is_staff = False
+    is_customer = True
 
 
-class CreatorFactory(UserFactory):
+class StaffFactory(UserFactory):
     class Meta:
-        model = Creator
+        model = User
 
-    is_creator = True
-
-
-class AdAgreementFactory(DjangoModelFactory):
-    class Meta:
-        model = AdAgreement
-
-    user = SubFactory(UserFactory)
-
-
-class AdNightAgreementFactory(DjangoModelFactory):
-    class Meta:
-        model = AdNightAgreement
-
-    user = SubFactory(UserFactory)
-
-
-class CreatorLinkFactory(DjangoModelFactory):
-    class Meta:
-        model = CreatorLink
-
-    user = SubFactory(UserFactory)
-    url = fake.url()
-
-
-class UserBlockFactory(DjangoModelFactory):
-    class Meta:
-        model = UserBlock
-
-    user = SubFactory(UserFactory)
-    blocked_user = SubFactory(UserFactory)
+    is_staff = True

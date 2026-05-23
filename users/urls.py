@@ -1,29 +1,25 @@
 from django.urls import path
 
 from .views import (
-    UserEmailLoginAPIView,
-    UserEmailSignupAPIView,
     MyProfileAPIView,
     MyProfileUpdateAPIView,
-    UserLogoutAPIView,
-    UserEmailSendConfirmCodeAPIView,
-    UserEmailCheckConfirmCodeAPIView,
-    CreatorProfileAPIView,
-    UserFindPwEmailSendConfirmCodeAPIView,
-    UserFindPwEmailCheckConfirmCodeAPIView,
-    UserEmailResetPwAPIView,
+    UserDeleteAccountAPIView,
     UserEmailAvailabilityAPIView,
+    UserEmailCheckConfirmCodeAPIView,
+    UserEmailLoginAPIView,
+    UserEmailResetPwAPIView,
+    UserEmailSendConfirmCodeAPIView,
+    UserEmailSignupAPIView,
+    UserFindPwEmailCheckConfirmCodeAPIView,
+    UserFindPwEmailSendConfirmCodeAPIView,
+    UserLogoutAPIView,
+    UserProfileAPIView,
+    UserRecoverAccountAPIView,
+    UserSocialCheckAPIView,
+    UserSocialSigninAPIView,
+    UserSocialSignupAPIView,
     UserTagAvailabilityAPIView,
     UserTagUpdateAPIView,
-    UserDeleteAccountAPIView,
-    UserRecoverAccountAPIView,
-    UserProfileAPIView,
-    UserSocialCheckAPIView,
-    UserSocialSignupAPIView,
-    UserSocialSigninAPIView,
-    UserBlockAPIView,
-    UserUnblockAPIView,
-    BlockedUsersAPIView,
 )
 
 urlpatterns = [
@@ -43,11 +39,7 @@ urlpatterns = [
         UserTagUpdateAPIView.as_view(),
         name="user-tag-update",
     ),
-    path(
-        "user/creator/<str:user_tag>/profile",
-        CreatorProfileAPIView.as_view(),
-        name="user-creator-profile",
-    ),
+
     path(
         "user/login/email",
         UserEmailLoginAPIView.as_view(),
@@ -131,20 +123,5 @@ urlpatterns = [
         UserSocialSigninAPIView.as_view(),
         name="user-social-signin",
     ),
-    # 사용자 차단 API
-    path(
-        "user/<str:user_tag>/block",
-        UserBlockAPIView.as_view(),
-        name="user-block",
-    ),
-    path(
-        "user/<str:user_tag>/unblock",
-        UserUnblockAPIView.as_view(),
-        name="user-unblock",
-    ),
-    path(
-        "user/blocked_users",
-        BlockedUsersAPIView.as_view(),
-        name="user-blocked-users",
-    ),
+
 ]

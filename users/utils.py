@@ -1,42 +1,39 @@
+import datetime
 import logging
 import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import authenticate
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
-from datetime import timedelta
 
 from auth_tokens.utils import CreateToken
 from utils.choices import LoginIdDuplicateCheckResultChoices, SocialLoginProviderChoices
-from utils.email_service import EmailService
+
+# from utils.email_service import EmailService
 from utils.exceptions import (
+    AccountNotMarkedForDeletion,
     AlreadyEnrolledEmail,
-    InvalidLoginInfo,
-    NotEnrolledEmail,
     EmailVerificationCodeExpired,
     EmailVerificationRateLimited,
+    InvalidLoginInfo,
     InvalidVerificationCode,
-    TokenAuthenticationFailed,
-    SocialUserExists,
+    NotEnrolledEmail,
+    RecoveryPeriodExpired,
     SocialAccessTokenExpired,
     SocialLoginIdentifierNotFound,
-    AccountNotMarkedForDeletion,
-    RecoveryPeriodExpired,
-    UserDoesNotExist,
-    CannotBlockYourself,
+    SocialUserExists,
+    TokenAuthenticationFailed,
     UserTagUpdateRestricted,
 )
+
 from .models import (
-    AdAgreement,
-    AdNightAgreement,
-    User,
     ConfirmEmail,
-    CreatorLink,
     SocialLoginIdentifier,
-    UserBlock,
+    User,
 )
-from .social_auth import SocialAuthModule, GoogleAuthModule, AppleAuthModule
+from .social_auth import AppleAuthModule, GoogleAuthModule, SocialAuthModule
 
 
 class CustomerAccountHandler:
@@ -50,50 +47,37 @@ class CustomerAccountHandler:
         self.user = kwargs.get("user", None)
         self.email = kwargs.get("email", None)
         self.password = kwargs.get("password", None)
-        self.name = kwargs.get("name", None)
-        self.user_tag = kwargs.get("user_tag", None)
+        self.profile_name = kwargs.get("profile_name", None)
+        self.username = kwargs.get("username", None)
         self.bio = kwargs.get("bio", "")
-        self.is_ad_agreed = kwargs.get("is_ad_agreed", None)
-        self.is_ad_night_agreed = kwargs.get("is_ad_night_agreed", None)
 
     @transaction.atomic
-    def email_signup(self, language="ko"):
+    def email_signup(self):
         # Convert email to lowercase
         email = self.email.lower() if self.email else None
-
-        # Format user_tag: convert to lowercase and ensure @ prefix
-        user_tag = self.user_tag.lower() if self.user_tag else None
+        username = self.username.lower() if self.username else None
 
         try:
             user = User.objects.create_user(
                 email=email,
                 password=self.password,
-                name=self.name,
-                user_tag=user_tag,
+                profile_name=self.profile_name,
+                username=username,
                 bio=self.bio,
             )
         except IntegrityError:
             raise AlreadyEnrolledEmail()
 
-        AdAgreement.objects.create(
-            user=user,
-            is_agreed=self.is_ad_agreed,
-        )
-        AdNightAgreement.objects.create(
-            user=user,
-            is_agreed=self.is_ad_night_agreed,
-        )
-
-        is_prod = settings.ENV == "prod"
-        if is_prod:
-            EmailService.send_template_email(
-                subject="Essentory 가입을 환영합니다",
-                recipients=email,
-                template_name="welcome",
-                context={"name": self.name},
-                async_send=True,
-                language=language,
-            )
+        # is_prod = settings.ENV == "prod"
+        # if is_prod:
+        #     EmailService.send_template_email(
+        #         subject="Essentory 가입을 환영합니다",
+        #         recipients=email,
+        #         template_name="welcome",
+        #         context={"profile_name": self.profile_name},
+        #         async_send=True,
+        #         language=language,
+        #     )
 
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
@@ -115,52 +99,25 @@ class CustomerAccountHandler:
         return user, {"token_value": token_value, "expiry": expiry}
 
     def update_profile(self, **kwargs):
-        is_ad_agreed = kwargs.pop("is_ad_agreed", None)
-        is_ad_night_agreed = kwargs.pop("is_ad_night_agreed", None)
-        creator_links = kwargs.pop("creator_links", [])
-
         # Format fields for update
         if "email" in kwargs and kwargs["email"]:
             kwargs["email"] = kwargs["email"].lower()
 
-        if "user_tag" in kwargs and kwargs["user_tag"]:
-            kwargs["user_tag"] = kwargs["user_tag"].lower()
+        if "username" in kwargs and kwargs["username"]:
+            kwargs["username"] = kwargs["username"].lower()
 
-        if is_ad_agreed is not None:
-            ad_agreement = AdAgreement.objects.get(user=self.user)
-            ad_agreement.is_agreed = is_ad_agreed
-            ad_agreement.save()
-        if is_ad_night_agreed is not None:
-            ad_night_agreement = AdNightAgreement.objects.get(user=self.user)
-            ad_night_agreement.is_agreed = is_ad_night_agreed
-            ad_night_agreement.save()
         User.objects.filter(id=self.user.id).update(**kwargs)
 
-        creator_links_to_create = []
-        for i, creator_link_info in enumerate(creator_links):
-            creator_link_id = creator_link_info.pop("id", None)
-            if creator_link_id:
-                self.user.creatorlink_set.filter(id=str(creator_link_id)).update(
-                    **creator_link_info
-                )
-            else:
-                creator_links_to_create.append(
-                    CreatorLink(
-                        user=self.user,
-                        **creator_link_info,
-                    )
-                )
-        CreatorLink.objects.bulk_create(creator_links_to_create)
         self.user.refresh_from_db()
         return self.user
 
-    def update_user_tag(self, user_tag):
+    def update_username(self, username):
         """
-        사용자의 프로필 태그(user_tag)를 변경합니다.
+        사용자의 프로필 태그(username)를 변경합니다.
         31일 내에 한 번만 변경할 수 있습니다.
 
         Args:
-            user_tag: 변경할 프로필 태그
+            username: 변경할 프로필 태그
 
         Returns:
             User: 업데이트된 사용자 객체
@@ -168,13 +125,13 @@ class CustomerAccountHandler:
         Raises:
             UserTagUpdateRestricted: 31일 내에 다시 태그를 변경하려고 할 때 발생
         """
-        # Ensure user_tag is lowercase for consistency
-        if user_tag:
-            user_tag = user_tag.lower()
+        # Ensure username is lowercase for consistency
+        if username:
+            username = username.lower()
 
-        # Check if user_tag is available (not used by other users)
+        # Check if username is available (not used by other users)
         if (
-            User.objects.filter(user_tag__iexact=user_tag)
+            User.objects.filter(username__iexact=username)
             .exclude(id=self.user.id)
             .exists()
         ):
@@ -183,24 +140,24 @@ class CustomerAccountHandler:
         # Check if user has changed tag in the last 31 days
         thirty_one_days_ago = timezone.now() - timedelta(days=31)
         if (
-            self.user.user_tag_changed_at
-            and self.user.user_tag_changed_at > thirty_one_days_ago
+            self.user.username_changed_at
+            and self.user.username_changed_at > thirty_one_days_ago
         ):
             raise UserTagUpdateRestricted()
 
-        old_user_tag = self.user.user_tag
+        old_username = self.user.username
 
-        # Update the user_tag and record the change time, then cascade to related content
+        # Update the username and record the change time, then cascade to related content
         with transaction.atomic():
             # Update user model
             User.objects.filter(id=self.user.id).update(
-                user_tag=user_tag, user_tag_changed_at=timezone.now()
+                username=username, username_changed_at=timezone.now()
             )
 
-            # Since user_tag is accessed via cached_property in content models,
+            # Since username is accessed via cached_property in content models,
             # we don't need to update the actual content tables
 
-            # However, we should invalidate any caches that might store the user_tag separately
+            # However, we should invalidate any caches that might store the username separately
             # This is a good place to add cache invalidation if needed in the future
 
         # Refresh user from database
@@ -235,19 +192,19 @@ class CustomerAccountHandler:
         user.password_changed_at = now
         user.save()
 
-        is_prod = settings.ENV == "prod"
-        if is_prod:
-            EmailService.send_template_email(
-                subject="Essentory 비밀번호가 변경되었습니다",
-                recipients=user.email,
-                template_name="password_changed",
-                context={
-                    "name": user.name,
-                    "changed_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-                },
-                async_send=True,
-                language=language,
-            )
+        # is_prod = settings.ENV == "prod"
+        # if is_prod:
+        #     EmailService.send_template_email(
+        #         subject="Essentory 비밀번호가 변경되었습니다",
+        #         recipients=user.email,
+        #         template_name="password_changed",
+        #         context={
+        #             "profile_name": user.profile_name,
+        #             "changed_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+        #         },
+        #         async_send=True,
+        #         language=language,
+        #     )
 
     def _authenticate(self):
         # Ensure email is lowercase for authentication
@@ -337,17 +294,17 @@ class CustomerAccountHandler:
             "expiry_minutes": settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES,
         }
 
-        if is_prod:
-            EmailService.send_template_email(
-                subject=subject,
-                recipients=email,
-                template_name=template_name,
-                context=context,
-                async_send=True,
-                language=language,
-            )
-        else:
-            logging.info(f"Verification code for {email}: {verification_code}")
+        # if is_prod:
+        #     EmailService.send_template_email(
+        #         subject=subject,
+        #         recipients=email,
+        #         template_name=template_name,
+        #         context=context,
+        #         async_send=True,
+        #         language=language,
+        #     )
+        # else:
+        #     logging.info(f"Verification code for {email}: {verification_code}")
 
         # Return the confirmation object for expiry information
         return {
@@ -466,25 +423,12 @@ class CustomerAccountHandler:
         self.user.deletion_requested_at = timezone.now()
         self.user.save()
 
-        # 3. Update related models
-        # Set AdAgreement to false
-        ad_agreement = AdAgreement.objects.get(user=self.user)
-        ad_agreement.is_agreed = False
-        ad_agreement.save()
-
-        ad_night_agreement = AdNightAgreement.objects.get(user=self.user)
-        ad_night_agreement.is_agreed = False
-        ad_night_agreement.save()
-
-        # 4. Remove creator links if any
-        CreatorLink.objects.filter(user=self.user).update(is_deleted=True)
-
-        # 5. Withdraw social login tokens(not delete)
-        social_login_identifiers = self.user.socialloginidentifier_set.all()
-        for social_login_identifier in social_login_identifiers:
-            SocialAuthHandler(social_login_identifier.provider).withdrawal(
-                social_login_identifier
-            )
+        # # 3. Withdraw social login tokens(not delete)
+        # social_login_identifiers = self.user.socialloginidentifier_set.all()
+        # for social_login_identifier in social_login_identifiers:
+        #     SocialAuthHandler(social_login_identifier.provider).withdrawal(
+        #         social_login_identifier
+        #     )
 
         return True
 
@@ -509,7 +453,7 @@ class CustomerAccountHandler:
             raise AccountNotMarkedForDeletion()
 
         # Check if the recovery period (30 days) has expired
-        thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+        thirty_days_ago = timezone.now() - datetime.timedelta(days=30)
         if self.user.deletion_requested_at < thirty_days_ago:
             raise RecoveryPeriodExpired()
 
@@ -594,14 +538,11 @@ class SocialAuthHandler:
     @transaction.atomic
     def create_user(
         self,
-        language,
         social_uuid,
         access_token,
-        name,
-        user_tag,
+        profile_name,
+        username,
         bio,
-        is_ad_agreed,
-        is_ad_night_agreed,
     ):
         if not SocialLoginIdentifier.objects.filter(id=social_uuid).exists():
             raise SocialLoginIdentifierNotFound()
@@ -611,17 +552,14 @@ class SocialAuthHandler:
         if social_login_identifier.temp_access_token != access_token[:100]:
             raise SocialAccessTokenExpired()
 
-        user_tag = user_tag.lower() if user_tag else None
-
-        if user_tag and user_tag.startswith("@"):
-            user_tag = user_tag.replace("@", "") if user_tag else None
+        username = username.lower() if username else None
 
         try:
             user = User.objects.create_user(
                 email=social_login_identifier.email.lower(),
                 password=None,
-                name=name,
-                user_tag=user_tag,
+                profile_name=profile_name,
+                username=username,
                 bio=bio,
             )
         except IntegrityError:
@@ -630,25 +568,16 @@ class SocialAuthHandler:
         social_login_identifier.user = user
         social_login_identifier.save()
 
-        AdAgreement.objects.create(
-            user=user,
-            is_agreed=is_ad_agreed,
-        )
-        AdNightAgreement.objects.create(
-            user=user,
-            is_agreed=is_ad_night_agreed,
-        )
-
-        is_prod = settings.ENV == "prod"
-        if is_prod:
-            EmailService.send_template_email(
-                subject="Essentory 가입을 환영합니다",
-                recipients=social_login_identifier.email,
-                template_name="welcome",
-                context={"name": name},
-                async_send=True,
-                language=language,
-            )
+        # is_prod = settings.ENV == "prod"
+        # if is_prod:
+        #     EmailService.send_template_email(
+        #         subject="Essentory 가입을 환영합니다",
+        #         recipients=social_login_identifier.email,
+        #         template_name="welcome",
+        #         context={"profile_name": profile_name},
+        #         async_send=True,
+        #         language=language,
+        #     )
 
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
@@ -669,91 +598,3 @@ class SocialAuthHandler:
 
     def withdrawal(self, social_login_identifier: SocialLoginIdentifier):
         self.module.withdrawal(social_login_identifier.identifier)
-
-
-class UserBlockHandler:
-    """
-    사용자 차단 관련 기능을 처리하는 핸들러
-    """
-
-    def __init__(self, user=None):
-        self.user = user
-
-    def block_user(self, user_tag):
-        """
-        다른 사용자를 차단합니다.
-
-        Args:
-            user_tag: 차단할 사용자의 태그
-
-        Returns:
-            UserBlock: 생성된 차단 정보
-
-        Raises:
-            UserDoesNotExist: 차단할 사용자가 존재하지 않는 경우
-            CannotBlockYourself: 자기 자신을 차단하려는 경우
-        """
-        # 차단할 사용자 검색 (대소문자 구분 없이)
-        try:
-            # Ensure user_tag is lowercase for case-insensitive matching
-            user_tag = user_tag.lower() if user_tag else None
-            blocked_user = User.objects.get(user_tag__iexact=user_tag)
-        except User.DoesNotExist:
-            raise UserDoesNotExist()
-
-        # 자기 자신을 차단하려는 경우 예외 발생
-        if blocked_user.id == self.user.id:
-            raise CannotBlockYourself()
-
-        # 이미 차단한 경우에는 그대로 반환
-        user_block, created = UserBlock.objects.get_or_create(
-            user=self.user, blocked_user=blocked_user
-        )
-
-        return user_block
-
-    def unblock_user(self, user_tag):
-        """
-        사용자 차단을 해제합니다.
-
-        Args:
-            user_tag: 차단 해제할 사용자의 태그
-
-        Returns:
-            bool: 차단 해제 성공 여부
-
-        Raises:
-            UserDoesNotExist: 차단 해제할 사용자가 존재하지 않는 경우
-        """
-        # 차단 해제할 사용자 검색 (대소문자 구분 없이)
-        try:
-            # Ensure user_tag is lowercase for case-insensitive matching
-            user_tag = user_tag.lower() if user_tag else None
-            blocked_user = User.objects.get(user_tag__iexact=user_tag)
-        except User.DoesNotExist:
-            raise UserDoesNotExist()
-
-        # 차단 정보 삭제
-        deleted, _ = UserBlock.objects.filter(
-            user=self.user, blocked_user=blocked_user
-        ).delete()
-
-        return deleted > 0
-
-    def get_blocked_users(self):
-        """
-        사용자가 차단한 사용자 목록을 조회합니다.
-
-        Returns:
-            QuerySet: 차단한 사용자 목록
-        """
-        return UserBlock.objects.filter(user=self.user).select_related("blocked_user")
-
-    def get_users_blocking_me(self):
-        """
-        사용자를 차단한 사용자 목록을 조회합니다.
-
-        Returns:
-            QuerySet: 나를 차단한 사용자 목록
-        """
-        return UserBlock.objects.filter(blocked_user=self.user).select_related("user")

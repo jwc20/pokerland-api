@@ -5,34 +5,29 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 
 from auth_tokens.auth import StrictTokenAuthentication
-from utils.paginations import ApiPageNumberPagination
 from users.serializers import (
-    UserMyProfileResponseSerializer,
-    UserEmailSignupSerializer,
-    UserMyProfileUpdateSerializer,
-    UserEmailSendConfirmCodeSerializer,
-    UserEmailSendConfirmCodeResponseSerializer,
-    UserEmailCheckConfirmCodeSerializer,
-    UserEmailCheckConfirmCodeResponseSerializer,
-    CreatorProfileResponseSerializer,
-    UserFindPwEmailSendConfirmCodeSerializer,
-    UserFindPwEmailCheckConfirmCodeSerializer,
-    UserFindPwEmailCheckConfirmCodeResponseSerializer,
-    UserEmailResetPwSerializer,
-    UserEmailAvailabilitySerializer,
-    UserEmailAvailabilityResponseSerializer,
-    UserTagAvailabilitySerializer,
-    UserTagAvailabilityResponseSerializer,
-    UserTagUpdateSerializer,
     UserDeleteAccountSerializer,
+    UserEmailAvailabilityResponseSerializer,
+    UserEmailAvailabilitySerializer,
+    UserEmailCheckConfirmCodeResponseSerializer,
+    UserEmailCheckConfirmCodeSerializer,
+    UserEmailResetPwSerializer,
+    UserEmailSendConfirmCodeResponseSerializer,
+    UserEmailSendConfirmCodeSerializer,
+    UserEmailSignupSerializer,
+    UserFindPwEmailCheckConfirmCodeResponseSerializer,
+    UserFindPwEmailCheckConfirmCodeSerializer,
+    UserFindPwEmailSendConfirmCodeSerializer,
+    UserMyProfileResponseSerializer,
+    UserMyProfileUpdateSerializer,
+    UsernameAvailabilityResponseSerializer,
+    UsernameUpdateSerializer,
     UserRecoverAccountSerializer,
     UserSocialCheckRequestSerializer,
     UserSocialCheckResponseSerializer,
-    UserSocialSignupSerializer,
     UserSocialSigninSerializer,
-    UserBlockResponseSerializer,
-    BlockedUsersResponseSerializer,
-    PaginatedBlockedUsersResponseSerializer,
+    UserSocialSignupSerializer,
+    UserTagAvailabilitySerializer,
 )
 from utils.commons import EmptySerializer
 from utils.custom_swaggers.commons import (
@@ -40,28 +35,30 @@ from utils.custom_swaggers.commons import (
     get_swagger_response_dict,
 )
 from utils.exceptions import (
-    InvalidLoginInfo,
+    AccountNotMarkedForDeletion,
     AlreadyEnrolledEmail,
-    NotEnrolledEmail,
-    TokenAuthenticationFailed,
+    CannotBlockYourself,
     EmailVerificationCodeExpired,
     EmailVerificationRateLimited,
+    InvalidLoginInfo,
     InvalidVerificationCode,
-    AccountNotMarkedForDeletion,
+    NotEnrolledEmail,
     RecoveryPeriodExpired,
+    SocialAccessTokenExpired,
     SocialLoginIdentifierNotFound,
     SocialUserExists,
-    SocialAccessTokenExpired,
+    TokenAuthenticationFailed,
     UserDoesNotExist,
-    CannotBlockYourself,
     UserTagUpdateRestricted,
 )
+from utils.paginations import ApiPageNumberPagination
 from utils.permissions import ApiPermission
+
 from .serializers import (
     UserEmailLoginSerializer,
     UserSignupLoginResponseSerializer,
 )
-from .utils import CustomerAccountHandler, SocialAuthHandler, UserBlockHandler
+from .utils import CustomerAccountHandler, SocialAuthHandler
 
 User = get_user_model()
 
@@ -239,9 +236,7 @@ class UserEmailSendConfirmCodeAPIView(GenericAPIView):
         ### 참고 사항
         전송된 이메일 인증코드는 {0}분 이내에 입력해야 합니다.
         10분 이내에 최대 3회까지만 요청할 수 있습니다.
-        """.format(
-            settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
-        ),
+        """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
                 status.HTTP_200_OK: UserEmailSendConfirmCodeResponseSerializer
@@ -280,9 +275,7 @@ class UserEmailCheckConfirmCodeAPIView(GenericAPIView):
         ---
         ### 참고 사항
         이메일 인증코드는 {0}분 이내에 입력해야 합니다.
-        """.format(
-            settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
-        ),
+        """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
                 status.HTTP_200_OK: UserEmailCheckConfirmCodeResponseSerializer
@@ -308,33 +301,6 @@ class UserEmailCheckConfirmCodeAPIView(GenericAPIView):
         )
 
 
-class CreatorProfileAPIView(GenericAPIView):
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-
-    @custom_swagger_auto_schema(
-        operation_summary="고객 본인 정보 보기",
-        operation_description="""
-        ### 인증 및 권한
-        1. api-key
-        2. Token (로그인 필요)
-        ---
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: CreatorProfileResponseSerializer},
-            api_exceptions=[TokenAuthenticationFailed],
-        ),
-    )
-    def get(self, request, *args, **kwargs):
-        user_tag = kwargs["user_tag"]
-
-        creator = User.objects.get(user_tag__iexact=user_tag, is_creator=True)
-        return Response(
-            status=status.HTTP_200_OK,
-            data=CreatorProfileResponseSerializer(creator).data,
-        )
-
-
 class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = []
@@ -349,9 +315,7 @@ class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
         ### 참고 사항
         전송된 이메일 인증코드는 {0}분 이내에 입력해야 합니다.
         10분 이내에 최대 3회까지만 요청할 수 있습니다.
-        """.format(
-            settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
-        ),
+        """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
                 status.HTTP_200_OK: UserEmailSendConfirmCodeResponseSerializer
@@ -391,9 +355,7 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
         ---
         ### 참고 사항
         이메일 인증코드는 {0}분 이내에 입력해야 합니다.
-        """.format(
-            settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
-        ),
+        """.format(settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES),
         responses=get_swagger_response_dict(
             success_response={
                 status.HTTP_200_OK: UserFindPwEmailCheckConfirmCodeResponseSerializer
@@ -515,7 +477,7 @@ class UserTagAvailabilityAPIView(GenericAPIView):
         """,
         responses=get_swagger_response_dict(
             success_response={
-                status.HTTP_200_OK: UserTagAvailabilityResponseSerializer
+                status.HTTP_200_OK: UsernameAvailabilityResponseSerializer
             },
         ),
         security=[{"api-key": {"type": "apiKey", "name": "api-key", "in": "header"}}],
@@ -532,7 +494,7 @@ class UserTagAvailabilityAPIView(GenericAPIView):
 
         return Response(
             status=status.HTTP_200_OK,
-            data=UserTagAvailabilityResponseSerializer(
+            data=UsernameAvailabilityResponseSerializer(
                 {"is_available": is_available}
             ).data,
         )
@@ -634,7 +596,7 @@ class UserRecoverAccountAPIView(GenericAPIView):
 class UserTagUpdateAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = [StrictTokenAuthentication]
-    serializer_class = UserTagUpdateSerializer
+    serializer_class = UsernameUpdateSerializer
 
     @custom_swagger_auto_schema(
         operation_summary="프로필 태그 변경",
@@ -820,104 +782,4 @@ class UserSocialSigninAPIView(GenericAPIView):
                     "token_info": token_info,
                 }
             ).data,
-        )
-
-
-class UserBlockAPIView(GenericAPIView):
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = EmptySerializer
-
-    @custom_swagger_auto_schema(
-        operation_summary="사용자 차단",
-        operation_description="""
-        ### 인증 및 권한
-        1. api-key
-        2. Token (로그인 필요)
-        ---
-        특정 사용자를 차단합니다.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: UserBlockResponseSerializer},
-            api_exceptions=[
-                UserDoesNotExist,
-                CannotBlockYourself,
-                TokenAuthenticationFailed,
-            ],
-        ),
-    )
-    def post(self, request, user_tag, *args, **kwargs):
-        user = request.user
-        block_handler = UserBlockHandler(user=user)
-
-        user_block = block_handler.block_user(user_tag=user_tag)
-
-        return Response(
-            status=status.HTTP_200_OK,
-            data=UserBlockResponseSerializer(user_block).data,
-        )
-
-
-class UserUnblockAPIView(GenericAPIView):
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = EmptySerializer
-
-    @custom_swagger_auto_schema(
-        operation_summary="사용자 차단 해제",
-        operation_description="""
-        ### 인증 및 권한
-        1. api-key
-        2. Token (로그인 필요)
-        ---
-        특정 사용자의 차단을 해제합니다.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: EmptySerializer},
-            api_exceptions=[UserDoesNotExist, TokenAuthenticationFailed],
-        ),
-    )
-    def post(self, request, user_tag, *args, **kwargs):
-        user = request.user
-        block_handler = UserBlockHandler(user=user)
-
-        block_handler.unblock_user(user_tag=user_tag)
-
-        return Response(
-            status=status.HTTP_200_OK,
-        )
-
-
-class BlockedUsersAPIView(GenericAPIView):
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = EmptySerializer
-    pagination_class = ApiPageNumberPagination
-    page_size = settings.DEFAULT_PAGE_SIZE  # Use default page size from settings
-
-    @custom_swagger_auto_schema(
-        operation_summary="차단한 사용자 목록 조회",
-        operation_description="""
-        ### 인증 및 권한
-        1. api-key
-        2. Token (로그인 필요)
-        ---
-        사용자가 차단한 사용자 목록을 조회합니다.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={
-                status.HTTP_200_OK: PaginatedBlockedUsersResponseSerializer
-            },
-            api_exceptions=[TokenAuthenticationFailed],
-        ),
-    )
-    def get(self, request, *args, **kwargs):
-        user = request.user
-        block_handler = UserBlockHandler(user=user)
-
-        blocked_users = block_handler.get_blocked_users().order_by("-created")
-
-        page = self.paginate_queryset(blocked_users)
-        return self.paginator.get_paginated_response(
-            BlockedUsersResponseSerializer(page, many=True).data
         )

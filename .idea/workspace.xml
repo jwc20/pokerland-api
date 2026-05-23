@@ -20,7 +20,8 @@
             <option name="id" value="715953a3-29c0-43fe-8d42-6082a3b10b92" />
             <option name="modeId" value="Agent" />
             <option name="modelType" value="builtin_family" />
-            <option name="modelValue" value="auto" />
+            <option name="modelValue" value="claude-sonnet-4.6" />
+            <option name="status" value="Completed" />
             <option name="targetType" value="LOCAL" />
           </session>
           <session>
@@ -41,6 +42,12 @@
       <entry key="_/Users/cjw/Development/pokerland_makethenut/pokerland-api" value="3E61Q5PG5xRUnMQVdteqFI3koIY" />
     </persistenceIdMap>
   </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="agent-panel" value="Claude Sonnet 4.6" />
+      <entry key="chat-panel" value="Claude Sonnet 4.6" />
+    </selectedModels>
+  </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
@@ -59,6 +66,20 @@
   &quot;fromUser&quot;: false
 }</component>
   <component name="ProjectId" id="3E61Q5PG5xRUnMQVdteqFI3koIY" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="claude-sonnet-4.6" />
+          </model>
+        </option>
+        <option name="targetType" value="LOCAL" />
+      </template>
+    </option>
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -66,6 +87,8 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.urls.executor": "Run",
+    "Python.utils.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",

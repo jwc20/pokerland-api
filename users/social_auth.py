@@ -1,17 +1,17 @@
 from abc import ABC, abstractmethod
-import requests
-from utils.exceptions import TokenAuthenticationFailed
-import jwt
-from django.conf import settings
 from datetime import datetime, timedelta
+
+import firebase_admin  # remove later
+import jwt
+import requests
+from django.conf import settings
 from django.utils import timezone
-
-
-from google.oauth2 import id_token
-from google.auth.transport import requests
-
-import firebase_admin
 from firebase_admin import auth
+from google.auth.transport import requests
+from google.oauth2 import id_token
+
+from utils.exceptions import TokenAuthenticationFailed
+
 # import requests
 
 
@@ -23,6 +23,7 @@ class SocialAuthModule(ABC):
     @abstractmethod
     def withdrawal(self, user_identifier):
         pass
+
 
 class GoogleAuthModule(SocialAuthModule):
     def check(self, access_token):
@@ -40,7 +41,9 @@ class GoogleAuthModule(SocialAuthModule):
             response = self._handle_id_token(access_token)
 
             if not response.get("valid"):
-                print(f"Invalid or expired token: {response.get('message') or response.get('error')}")
+                print(
+                    f"Invalid or expired token: {response.get('message') or response.get('error')}"
+                )
                 return None
 
             uid = response.get("uid")
@@ -69,24 +72,18 @@ class GoogleAuthModule(SocialAuthModule):
             if now > exp:
                 return {
                     "valid": False,
-                    "message": "Token has expired. Please refresh it on the client."
+                    "message": "Token has expired. Please refresh it on the client.",
                 }
 
             id_info = id_token.verify_oauth2_token(id_token_str, requests.Request())
 
-            return {
-                "valid": True,
-                "uid": id_info["sub"],
-                "email": id_info.get("email")
-            }
+            return {"valid": True, "uid": id_info["sub"], "email": id_info.get("email")}
 
         except Exception as e:
             return {"valid": False, "error": str(e)}
 
 
-
 class AppleAuthModule(SocialAuthModule):
-
     def check(self, access_token):
 
         ################################# TODO
