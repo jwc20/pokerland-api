@@ -63,12 +63,22 @@ from .utils import CustomerAccountHandler, SocialAuthHandler
 User = get_user_model()
 
 
+SWAGGER_TAG_AUTH_EMAIL = ["Users - Email Auth"]
+SWAGGER_TAG_EMAIL_VERIFICATION = ["Users - Email Verification"]
+SWAGGER_TAG_PASSWORD = ["Users - Password"]
+SWAGGER_TAG_PROFILE = ["Users - Profile"]
+SWAGGER_TAG_ACCOUNT = ["Users - Account"]
+SWAGGER_TAG_USERNAME = ["Users - Username / Tag"]
+SWAGGER_TAG_SOCIAL_AUTH = ["Users - Social Auth"]
+
+
 class UserEmailLoginAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = []
     serializer_class = UserEmailLoginSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_AUTH_EMAIL,
         operation_summary="Login with email",
         operation_description="""
         ### Authentication and Authorization
@@ -104,6 +114,7 @@ class UserEmailSignupAPIView(GenericAPIView):
     serializer_class = UserEmailSignupSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_AUTH_EMAIL,
         operation_summary="Sign up with email (email verification required)",
         operation_description="""
         ### Authentication and Authorization
@@ -140,6 +151,7 @@ class MyProfileAPIView(GenericAPIView):
     authentication_classes = [StrictTokenAuthentication]
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PROFILE,
         operation_summary="Get my profile",
         operation_description="""
             ### Authentication and Authorization
@@ -166,6 +178,7 @@ class MyProfileUpdateAPIView(GenericAPIView):
     serializer_class = UserMyProfileUpdateSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PROFILE,
         operation_summary="Update my profile",
         operation_description="""
         ### Authentication and Authorization
@@ -196,6 +209,7 @@ class UserLogoutAPIView(GenericAPIView):
     serializer_class = EmptySerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_AUTH_EMAIL,
         operation_summary="Logout",
         operation_description="""
         ### Authentication and Authorization
@@ -212,7 +226,8 @@ class UserLogoutAPIView(GenericAPIView):
         user = request.user
         # TODO - Extract the logic below into a reusable module.
         token_value = request.META.get(
-            f"HTTP_{settings.AUTH_TOKEN_SETTING['AUTH_HEADER_PREFIX'].upper()}", None
+            f"HTTP_{settings.AUTH_TOKEN_SETTING['AUTH_HEADER_PREFIX'].upper()}",
+            None,
         )
         CustomerAccountHandler(user=user).logout(token_value)
         return Response(
@@ -226,6 +241,7 @@ class UserEmailSendConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserEmailSendConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_EMAIL_VERIFICATION,
         operation_summary="Send verification code to submitted email",
         operation_description="""
         ### Authentication and Authorization
@@ -248,8 +264,10 @@ class UserEmailSendConfirmCodeAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         # Get language from request (set by LanguageMiddleware)
         language = getattr(request, "language", "ko")
+
         result = CustomerAccountHandler().send_confirm_code(
             email=serializer.validated_data["email"],
             language=language,
@@ -266,6 +284,7 @@ class UserEmailCheckConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserEmailCheckConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_EMAIL_VERIFICATION,
         operation_summary="Verify code (always `000000` in non-prod environments)",
         operation_description="""
         ### Authentication and Authorization
@@ -305,6 +324,7 @@ class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserFindPwEmailSendConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PASSWORD,
         operation_summary="Send verification code for password reset",
         operation_description="""
         ### Authentication and Authorization
@@ -327,8 +347,10 @@ class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         # Get language from request (set by LanguageMiddleware)
         language = getattr(request, "language", "ko")
+
         result = CustomerAccountHandler().send_confirm_code(
             email=serializer.validated_data["email"],
             is_signup=False,
@@ -346,6 +368,7 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
     serializer_class = UserFindPwEmailCheckConfirmCodeSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PASSWORD,
         operation_summary="Verify password-reset code (always `000000` in non-prod)",
         operation_description="""
         ### Authentication and Authorization
@@ -371,6 +394,7 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
         is_confirmed = customer_account_handler.check_confirm_code(
             **serializer.validated_data,
         )
+
         if is_confirmed:
             # Extract only the email from validated_data for force_login
             user, token_info = customer_account_handler.force_login(
@@ -383,7 +407,11 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
         return Response(
             status=status.HTTP_200_OK,
             data=UserFindPwEmailCheckConfirmCodeResponseSerializer(
-                {"is_confirmed": is_confirmed, "user": user, "token_info": token_info}
+                {
+                    "is_confirmed": is_confirmed,
+                    "user": user,
+                    "token_info": token_info,
+                }
             ).data,
         )
 
@@ -394,6 +422,7 @@ class UserEmailResetPwAPIView(GenericAPIView):
     serializer_class = UserEmailResetPwSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PASSWORD,
         operation_summary="Reset password",
         operation_description="""
         ### Authentication and Authorization
@@ -434,6 +463,7 @@ class UserEmailAvailabilityAPIView(GenericAPIView):
     serializer_class = UserEmailAvailabilitySerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_AUTH_EMAIL,
         operation_summary="Check email availability",
         operation_description="""
         ### Authentication and Authorization
@@ -450,9 +480,11 @@ class UserEmailAvailabilityAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         # Convert to lowercase for case-insensitive check
         email = serializer.validated_data["email"].lower()
         is_available = not User.objects.filter(email__iexact=email).exists()
+
         return Response(
             status=status.HTTP_200_OK,
             data=UserEmailAvailabilityResponseSerializer(
@@ -467,6 +499,7 @@ class UserTagAvailabilityAPIView(GenericAPIView):
     serializer_class = UserTagAvailabilitySerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_USERNAME,
         operation_summary="Check user tag availability",
         operation_description="""
         ### Authentication and Authorization
@@ -504,6 +537,7 @@ class UserDeleteAccountAPIView(GenericAPIView):
     serializer_class = UserDeleteAccountSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_ACCOUNT,
         operation_summary="Delete account (withdrawal)",
         operation_description="""
         ### Authentication and Authorization
@@ -532,6 +566,7 @@ class UserDeleteAccountAPIView(GenericAPIView):
 
     #
     # @custom_swagger_auto_schema(
+    #     tags=SWAGGER_TAG_ACCOUNT,
     #     operation_summary="Account deletion confirmation page",
     #     operation_description="""
     #     ### Authentication and Authorization
@@ -560,6 +595,7 @@ class UserRecoverAccountAPIView(GenericAPIView):
     serializer_class = UserRecoverAccountSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_ACCOUNT,
         operation_summary="Recover account",
         operation_description="""
         ### Authentication and Authorization
@@ -597,6 +633,7 @@ class UserTagUpdateAPIView(GenericAPIView):
     serializer_class = UsernameUpdateSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_USERNAME,
         operation_summary="Change profile tag",
         operation_description="""
         ### Authentication and Authorization
@@ -635,6 +672,7 @@ class UserProfileAPIView(GenericAPIView):
     authentication_classes = [StrictTokenAuthentication]
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_PROFILE,
         operation_summary="Get user profile",
         operation_description="""
         ### Authentication and Authorization
@@ -663,6 +701,7 @@ class UserSocialCheckAPIView(GenericAPIView):
     serializer_class = UserSocialCheckRequestSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_SOCIAL_AUTH,
         operation_summary="Validate social login",
         operation_description="""
         ### Authentication and Authorization
@@ -672,7 +711,7 @@ class UserSocialCheckAPIView(GenericAPIView):
         social_uuid is a unique identifier used for signup and login.
         If is_new is True, proceed with social signup flow.
         If is_new is False, proceed with existing social sign-in flow.
-        
+
         For Google, use the code received via query parameter.
         For Apple, use identityToken as access_token.
         """,
@@ -692,7 +731,11 @@ class UserSocialCheckAPIView(GenericAPIView):
         return Response(
             status=status.HTTP_200_OK,
             data=UserSocialCheckResponseSerializer(
-                {"social_uuid": social_uuid, "email": email, "is_new": is_new}
+                {
+                    "social_uuid": social_uuid,
+                    "email": email,
+                    "is_new": is_new,
+                }
             ).data,
         )
 
@@ -703,6 +746,7 @@ class UserSocialSignupAPIView(GenericAPIView):
     serializer_class = UserSocialSignupSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_SOCIAL_AUTH,
         operation_summary="Social login signup",
         operation_description="""
         ### Authentication and Authorization
@@ -730,7 +774,8 @@ class UserSocialSignupAPIView(GenericAPIView):
 
         social_auth_handler = SocialAuthHandler(None)
         user, token_info = social_auth_handler.create_user(
-            language=language, **serializer.validated_data
+            language=language,
+            **serializer.validated_data,
         )
 
         return Response(
@@ -750,6 +795,7 @@ class UserSocialSigninAPIView(GenericAPIView):
     serializer_class = UserSocialSigninSerializer
 
     @custom_swagger_auto_schema(
+        tags=SWAGGER_TAG_SOCIAL_AUTH,
         operation_summary="Social login (existing user)",
         operation_description="""
         ### Authentication and Authorization
