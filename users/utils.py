@@ -165,7 +165,7 @@ class CustomerAccountHandler:
         return self.user
 
     def logout(self, token_value):
-        self.user.authtoken_set.filter(token_key=token_value[:8]).delete()
+        self.user.authtoken_set.filter(token_key=token_value).delete()
 
     def find_email(self):
         # TODO - Complete once phone-number data and lookup logic are added.

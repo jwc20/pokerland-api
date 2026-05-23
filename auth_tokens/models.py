@@ -17,7 +17,7 @@ class AuthTokenManager(models.Manager):
             expiry = timezone.now() + expiry
 
         instance = super(AuthTokenManager, self).create(
-            token_key=token_value[:8],
+            token_key=token_value,
             digest=digest,
             user=user,
             expiry=expiry,
@@ -32,7 +32,7 @@ class AuthToken(models.Model):
 
     digest = models.CharField(max_length=128, primary_key=True)
     token_key = models.CharField(
-        max_length=8,
+        max_length=128,
         db_index=True,
         help_text="Partial token value stored in DB to avoid exposing full token if compromised.",
     )

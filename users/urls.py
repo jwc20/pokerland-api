@@ -35,11 +35,10 @@ urlpatterns = [
         name="user-my-profile-update",
     ),
     path(
-        "user/user_tag/update",
+        "user/username/update",
         UserTagUpdateAPIView.as_view(),
         name="user-tag-update",
     ),
-
     path(
         "user/login/email",
         UserEmailLoginAPIView.as_view(),
@@ -99,12 +98,12 @@ urlpatterns = [
         name="user-signup-check-email",
     ),
     path(
-        "user/signup/check_user_tag",
+        "user/signup/check_username",
         UserTagAvailabilityAPIView.as_view(),
         name="user-signup-check-user-tag",
     ),
     path(
-        "user/<str:user_tag>/profile",
+        "user/<str:username>/profile",
         UserProfileAPIView.as_view(),
         name="user-profile",
     ),
@@ -123,5 +122,4 @@ urlpatterns = [
         UserSocialSigninAPIView.as_view(),
         name="user-social-signin",
     ),
-
 ]

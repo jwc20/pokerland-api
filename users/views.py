@@ -121,11 +121,9 @@ class UserEmailSignupAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # Get language from request (set by LanguageMiddleware)
-        language = getattr(request, "language", "ko")
         user, token_info = CustomerAccountHandler(
             **serializer.validated_data
-        ).email_signup(language=language)
+        ).email_signup()
         return Response(
             status=status.HTTP_200_OK,
             data=UserSignupLoginResponseSerializer(
@@ -486,11 +484,11 @@ class UserTagAvailabilityAPIView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Get the user_tag from the request and ensure proper format
-        user_tag = serializer.validated_data["user_tag"].lower()
+        # Get the username from the request and ensure proper format
+        username = serializer.validated_data["username"].lower()
 
         # Case-insensitive check to ensure uniqueness
-        is_available = not User.objects.filter(user_tag__iexact=user_tag).exists()
+        is_available = not User.objects.filter(username__iexact=username).exists()
 
         return Response(
             status=status.HTTP_200_OK,
@@ -622,8 +620,8 @@ class UserTagUpdateAPIView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = CustomerAccountHandler(user=request.user).update_user_tag(
-            serializer.validated_data["user_tag"]
+        user = CustomerAccountHandler(user=request.user).update_username(
+            serializer.validated_data["username"]
         )
 
         return Response(
@@ -650,9 +648,9 @@ class UserProfileAPIView(GenericAPIView):
         ),
     )
     def get(self, request, *args, **kwargs):
-        user_tag = kwargs["user_tag"]
+        username = kwargs["username"]
 
-        creator = User.objects.get(user_tag__iexact=user_tag)
+        creator = User.objects.get(username__iexact=username)
         return Response(
             status=status.HTTP_200_OK,
             data=UserMyProfileResponseSerializer(creator).data,

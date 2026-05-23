@@ -15,8 +15,8 @@ class UserFactory(DjangoModelFactory):
         model = User
 
     email = Sequence(lambda n: f"dummy{n}@test.com")
-    name = Sequence(lambda n: f"dummy_name{n}")
-    user_tag = Sequence(lambda n: f"dummy_{n}")
+    profile_name = Sequence(lambda n: f"dummy_name{n}")
+    username = Sequence(lambda n: f"dummy_{n}")
 
 
 class CustomerFactory(UserFactory):

@@ -35,11 +35,9 @@ class UserEmailSignupSerializer(serializers.Serializer):
         min_length=8,
         help_text=f"Must match the following regex: {PASSWORD_REGEX}",
     )
-    name = serializers.CharField()
-    user_tag = serializers.CharField()
+    profile_name = serializers.CharField()
+    username = serializers.CharField()
     bio = serializers.CharField(allow_blank=True)
-    is_ad_agreed = serializers.BooleanField()
-    is_ad_night_agreed = serializers.BooleanField()
 
     def validate_email(self, value):
         """Normalize email to lowercase"""
@@ -47,8 +45,8 @@ class UserEmailSignupSerializer(serializers.Serializer):
             return value.lower()
         return value
 
-    def validate_user_tag(self, value):
-        """Normalize user_tag to lowercase"""
+    def validate_username(self, value):
+        """Normalize username to lowercase"""
         if value:
             value = value.lower()
         return value
@@ -172,10 +170,10 @@ class UserEmailAvailabilityResponseSerializer(serializers.Serializer):
 
 
 class UserTagAvailabilitySerializer(serializers.Serializer):
-    user_tag = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
 
-    def validate_user_tag(self, value):
-        """Normalize user_tag to lowercase"""
+    def validate_username(self, value):
+        """Normalize username to lowercase"""
         if value:
             value = value.lower()
         return value
@@ -186,7 +184,7 @@ class UsernameAvailabilityResponseSerializer(serializers.Serializer):
 
 
 class UsernameUpdateSerializer(serializers.Serializer):
-    user_tag = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
 
     def validate_username(self, value):
         if value:

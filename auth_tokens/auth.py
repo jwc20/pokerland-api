@@ -47,7 +47,7 @@ class BaseTokenAuthenticationMixin:
 
         Tokens that have expired will be deleted and skipped
         """
-        for auth_token in AuthToken.objects.filter(token_key=token[:8]):
+        for auth_token in AuthToken.objects.filter(token_key=token):
             if self._cleanup_token(auth_token):
                 continue
             try:
@@ -112,4 +112,3 @@ class OptionalTokenAuthentication(BaseTokenAuthenticationMixin, BaseAuthenticati
         if not auth:
             return None, None
         return self._authenticate_credentials(auth)
-

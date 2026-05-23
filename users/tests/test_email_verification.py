@@ -29,7 +29,7 @@
 #             email="test@example.com",
 #             password="TestPassword123!",
 #             name="Test User",
-#             user_tag="testuser",
+#             username="testuser",
 #         )
 #
 #         # Setup URLs

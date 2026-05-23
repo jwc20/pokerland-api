@@ -20,7 +20,7 @@ class CommentModelMixin(models.Model):
     like_cnt = models.PositiveIntegerField("Like count", default=0)
 
     @cached_property
-    def user_tag(self):
+    def username(self):
         return self.user.username
 
     @cached_property
@@ -56,7 +56,7 @@ class CommentReplyModelMixin(models.Model):
     like_cnt = models.PositiveIntegerField("Like count", default=0)
 
     @cached_property
-    def user_tag(self):
+    def username(self):
         return self.user.username
 
     @cached_property

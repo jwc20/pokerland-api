@@ -50,26 +50,32 @@ class InvalidLoginInfo(CustomAPIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "invalid_login_info"
     swagger_description = "Login information is invalid"
-    
+
+
 class SocialLoginIdentifierNotFound(CustomAPIException):
     status_code = status.HTTP_404_NOT_FOUND
     default_detail = "social_login_identifier_not_found"
     swagger_description = "Social login verification info not found."
-    
+
+
 class SocialUserExists(CustomAPIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "social_user_exists"
     swagger_description = "Social account already exists"
+
 
 class SocialAccessTokenExpired(CustomAPIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "social_access_token_expired"
     swagger_description = "Social account access token has expired"
 
+
 class TokenAuthenticationFailed(CustomAPIException):
     status_code = status.HTTP_401_UNAUTHORIZED
     default_detail = "authentication_failed"
-    swagger_description = "Token authentication failed (possible in all token-auth endpoints)"
+    swagger_description = (
+        "Token authentication failed (possible in all token-auth endpoints)"
+    )
 
 
 class NotMyCommunityPost(CustomAPIException):
@@ -250,5 +256,5 @@ class CannotBlockYourself(CustomAPIException):
 
 class UserTagUpdateRestricted(CustomAPIException):
     status_code = status.HTTP_400_BAD_REQUEST
-    default_detail = "user_tag_update_restricted"
+    default_detail = "username_update_restricted"
     swagger_description = "Profile tag can be changed only once every 31 days"
