@@ -258,3 +258,9 @@ class UserTagUpdateRestricted(CustomAPIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "username_update_restricted"
     swagger_description = "Profile tag can be changed only once every 31 days"
+
+
+class UsernameAlreadyTaken(CustomAPIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = "username_already_taken"
+    swagger_description = "Username / profile tag is already in use"

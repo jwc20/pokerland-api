@@ -25,12 +25,12 @@ from .views import (
 urlpatterns = [
     # Common user APIs
     path(
-        "user/my_profile",
+        "user/my-profile",
         MyProfileAPIView.as_view(),
         name="user-my-profile",
     ),
     path(
-        "user/my_profile/update",
+        "user/my-profile/update",
         MyProfileUpdateAPIView.as_view(),
         name="user-my-profile-update",
     ),
@@ -49,14 +49,13 @@ urlpatterns = [
         UserLogoutAPIView.as_view(),
         name="user-logout",
     ),
-    # TODO - Add tests for the two APIs below
     path(
-        "user/signup/email/send_confirm_code",
+        "user/signup/email/send-confirm-code",
         UserEmailSendConfirmCodeAPIView.as_view(),
         name="user-signup-email-send-confirm-code",
     ),
     path(
-        "user/signup/email/check_confirm_code",
+        "user/signup/email/check-confirm-code",
         UserEmailCheckConfirmCodeAPIView.as_view(),
         name="user-signup-email-check-confirm-code",
     ),
@@ -67,38 +66,38 @@ urlpatterns = [
         name="user-signup-email",
     ),
     path(
-        "user/find_pw/email/send_confirm_code",
+        "user/find-pw/email/send-confirm-code",
         UserFindPwEmailSendConfirmCodeAPIView.as_view(),
         name="user-find-pw-email-send-confirm-code",
     ),
     path(
-        "user/find_pw/email/check_confirm_code",
+        "user/find-pw/email/check-confirm-code",
         UserFindPwEmailCheckConfirmCodeAPIView.as_view(),
         name="user-find-pw-email-check-confirm-code",
     ),
     path(
-        "user/email/reset_pw",
+        "user/email/reset-pw",
         UserEmailResetPwAPIView.as_view(),
         name="user-email-reset-pw",
     ),
     path(
-        "user/delete_account",
+        "user/delete-account",
         UserDeleteAccountAPIView.as_view(),
         name="user-delete-account",
     ),
     path(
-        "user/recover_account",
+        "user/recover-account",
         UserRecoverAccountAPIView.as_view(),
         name="user-recover-account",
     ),
     # Signup-related availability check APIs
     path(
-        "user/signup/check_email",
+        "user/signup/check-email",
         UserEmailAvailabilityAPIView.as_view(),
         name="user-signup-check-email",
     ),
     path(
-        "user/signup/check_username",
+        "user/signup/check-username",
         UserTagAvailabilityAPIView.as_view(),
         name="user-signup-check-user-tag",
     ),

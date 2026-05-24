@@ -1,5 +1,3 @@
-import datetime
-import logging
 import random
 from datetime import timedelta
 
@@ -11,7 +9,6 @@ from django.utils import timezone
 from auth_tokens.utils import CreateToken
 from utils.choices import LoginIdDuplicateCheckResultChoices, SocialLoginProviderChoices
 
-# from utils.email_service import EmailService
 from utils.exceptions import (
     AccountNotMarkedForDeletion,
     AlreadyEnrolledEmail,
@@ -25,6 +22,7 @@ from utils.exceptions import (
     SocialLoginIdentifierNotFound,
     SocialUserExists,
     TokenAuthenticationFailed,
+    UsernameAlreadyTaken,
     UserTagUpdateRestricted,
 )
 
@@ -43,17 +41,16 @@ class CustomerAccountHandler:
     By default, all accounts have customer permissions.
     """
 
-    def __init__(self, **kwargs):
-        self.user = kwargs.get("user", None)
-        self.email = kwargs.get("email", None)
-        self.password = kwargs.get("password", None)
-        self.profile_name = kwargs.get("profile_name", None)
-        self.username = kwargs.get("username", None)
-        self.bio = kwargs.get("bio", "")
+    def __init__(self, **kwargs) -> None:
+        self.user: User | None = kwargs.get("user", None)
+        self.email: str | None = kwargs.get("email", None)
+        self.password: str | None = kwargs.get("password", None)
+        self.profile_name: str | None = kwargs.get("profile_name", None)
+        self.username: str | None = kwargs.get("username", None)
+        self.bio: str = kwargs.get("bio", "")
 
     @transaction.atomic
-    def email_signup(self):
-        # Convert email to lowercase
+    def email_signup(self) -> tuple[User, dict]:
         email = self.email.lower() if self.email else None
         username = self.username.lower() if self.username else None
 
@@ -68,21 +65,10 @@ class CustomerAccountHandler:
         except IntegrityError:
             raise AlreadyEnrolledEmail()
 
-        # is_prod = settings.ENV == "prod"
-        # if is_prod:
-        #     EmailService.send_template_email(
-        #         subject="Welcome to Essentory",
-        #         recipients=email,
-        #         template_name="welcome",
-        #         context={"profile_name": self.profile_name},
-        #         async_send=True,
-        #         language=language,
-        #     )
-
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
-    def login_id_duplicate_check(self):
+    def login_id_duplicate_check(self) -> str:
         # TODO - Decide how withdrawn or dormant accounts should be handled.
         # Ensure email is lowercase and check case-insensitively
         email = self.email.lower() if self.email else None
@@ -91,14 +77,12 @@ class CustomerAccountHandler:
         else:
             return LoginIdDuplicateCheckResultChoices.unique
 
-    def login(self):
+    def login(self) -> tuple[User, dict]:
         user = self._authenticate()
-        # Should the first token be invalidated?
-        # Should later tokens have a shorter expiry?
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
-    def update_profile(self, **kwargs):
+    def update_profile(self, **kwargs) -> User:
         # Format fields for update
         if "email" in kwargs and kwargs["email"]:
             kwargs["email"] = kwargs["email"].lower()
@@ -111,7 +95,7 @@ class CustomerAccountHandler:
         self.user.refresh_from_db()
         return self.user
 
-    def update_username(self, username):
+    def update_username(self, username: str) -> User:
         """
         Change user's profile tag (username).
         It can be changed only once within 31 days.
@@ -135,7 +119,7 @@ class CustomerAccountHandler:
             .exclude(id=self.user.id)
             .exists()
         ):
-            raise AlreadyEnrolledEmail()  # Reusing this exception for tag uniqueness
+            raise UsernameAlreadyTaken()
 
         # Check if user has changed tag in the last 31 days
         thirty_one_days_ago = timezone.now() - timedelta(days=31)
@@ -164,50 +148,34 @@ class CustomerAccountHandler:
         self.user.refresh_from_db()
         return self.user
 
-    def logout(self, token_value):
+    def logout(self, token_value: str) -> None:
         self.user.authtoken_set.filter(token_key=token_value).delete()
 
-    def find_email(self):
-        # TODO - Complete once phone-number data and lookup logic are added.
-        pass
-
-    def reset_password(self, new_password, email=None, language="ko"):
+    def reset_password(self, new_password: str, email: str | None = None, language: str = "ko") -> None:
         user = self.user
-        # If no user is provided but email is, use the email to find the user
         if (not user or user.is_anonymous) and email:
             try:
                 user = User.objects.get(email__iexact=email)
             except User.DoesNotExist:
                 raise NotEnrolledEmail()
 
-        # Ensure we have a user to work with
         if not user:
             raise NotEnrolledEmail()
 
-        # Change password and update timestamp
         user.set_password(new_password)
-
-        # Set password change timestamp
         now = timezone.now()
         user.password_changed_at = now
         user.save()
 
-        # is_prod = settings.ENV == "prod"
-        # if is_prod:
-        #     EmailService.send_template_email(
-        #         subject="Your Essentory Password Has Been Changed",
-        #         recipients=user.email,
-        #         template_name="password_changed",
-        #         context={
-        #             "profile_name": user.profile_name,
-        #             "changed_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-        #         },
-        #         async_send=True,
-        #         language=language,
-        #     )
+    def _authenticate(self) -> User:
+        """Authenticate user by email/password.
 
-    def _authenticate(self):
-        # Ensure email is lowercase for authentication
+        If ``django.contrib.auth.authenticate`` fails (e.g. because the
+        account is inactive), a secondary path checks the password manually
+        and, if valid, attempts account recovery. This allows users whose
+        account is marked for deletion to log back in within the 30-day
+        recovery window.
+        """
         email = self.email.lower() if self.email else None
 
         user = authenticate(
@@ -230,7 +198,7 @@ class CustomerAccountHandler:
             )
             return user
 
-    def send_confirm_code(self, email, is_signup=True, language="ko"):
+    def send_confirm_code(self, email: str, is_signup: bool = True, language: str = "ko") -> dict:
         """
         Send a verification code to the specified email address.
         Handles rate limiting and environment-specific behavior.
@@ -284,35 +252,14 @@ class CustomerAccountHandler:
             confirm_code=verification_code,
         )
 
-        # Send email with verification code
-        template_name = "password_reset" if not is_signup else "verification_code"
-        subject = "Password reset code" if not is_signup else "Email verification code"
+        # TODO: Re-enable email sending via EmailService when ready for production.
 
-        # Prepare template context
-        context = {
-            "code": verification_code,
-            "expiry_minutes": settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES,
-        }
-
-        # if is_prod:
-        #     EmailService.send_template_email(
-        #         subject=subject,
-        #         recipients=email,
-        #         template_name=template_name,
-        #         context=context,
-        #         async_send=True,
-        #         language=language,
-        #     )
-        # else:
-        #     logging.info(f"Verification code for {email}: {verification_code}")
-
-        # Return the confirmation object for expiry information
         return {
             "created_at": confirm_email.created,
             "expires_in_minutes": settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES,
         }
 
-    def check_confirm_code(self, email, confirm_code):
+    def check_confirm_code(self, email: str, confirm_code: str) -> bool:
         """
         Verify the confirmation code for a given email address.
 
@@ -321,84 +268,64 @@ class CustomerAccountHandler:
             confirm_code: The confirmation code to check
 
         Returns:
-            bool: True if the code is valid and confirmed, False otherwise
+            bool: True if the code is valid and confirmed
 
         Raises:
             EmailVerificationCodeExpired: If the verification code has expired
             InvalidVerificationCode: If the code doesn't match
         """
-        # Ensure email is lowercase for consistency
         email = email.lower() if email else None
 
-        #  allow 000000 in dev and local environments
+        email_confirmation = self._get_latest_confirmation(email)
+
+        # In dev/local environments, accept 000000 as a bypass code
         if confirm_code == "000000" and settings.ENV in ["dev", "local"]:
-            # Get the most recent confirmation record for this email
-            email_confirmation = (
-                ConfirmEmail.objects.filter(
-                    email__iexact=email,
-                )
-                .order_by("-created")
-                .first()
-            )
-
-            # No confirmation record found
-            if not email_confirmation:
-                raise InvalidVerificationCode()
-
-            # Check if code has expired
-            expiry_time = email_confirmation.created + timedelta(
-                minutes=settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
-            )
-
-            if timezone.now() > expiry_time:
-                raise EmailVerificationCodeExpired()
-
-            # Mark as confirmed
-            email_confirmation.is_confirmed = True
-            email_confirmation.save()
+            self._mark_confirmed(email_confirmation)
             return True
 
-        # Regular validation for other cases
-        # Get the most recent confirmation record for this email
+        # Regular validation — code must match
+        if email_confirmation.confirm_code != confirm_code:
+            raise InvalidVerificationCode()
+
+        self._mark_confirmed(email_confirmation)
+        return True
+
+    @staticmethod
+    def _get_latest_confirmation(email: str) -> ConfirmEmail:
+        """Fetch the most recent confirmation record and validate it hasn't expired."""
         email_confirmation = (
-            ConfirmEmail.objects.filter(
-                email__iexact=email,
-            )
+            ConfirmEmail.objects.filter(email__iexact=email)
             .order_by("-created")
             .first()
         )
 
-        # No confirmation record found
         if not email_confirmation:
             raise InvalidVerificationCode()
 
-        # Check if code has expired
         expiry_time = email_confirmation.created + timedelta(
             minutes=settings.EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES
         )
-
         if timezone.now() > expiry_time:
             raise EmailVerificationCodeExpired()
 
-        # Check if the code matches
-        if email_confirmation.confirm_code == confirm_code:
-            # Mark as confirmed
-            email_confirmation.is_confirmed = True
-            email_confirmation.save()
-            return True
-        else:
-            raise InvalidVerificationCode()
+        return email_confirmation
 
-    def _check_confirmed_email(self, email):
+    @staticmethod
+    def _mark_confirmed(email_confirmation: ConfirmEmail) -> None:
+        """Mark a confirmation record as confirmed."""
+        email_confirmation.is_confirmed = True
+        email_confirmation.save()
+
+    def _check_confirmed_email(self, email: str) -> bool:
         return ConfirmEmail.objects.filter(email=email, is_confirmed=True).exists()
 
-    def force_login(self, email):
+    def force_login(self, email: str) -> tuple[User, dict]:
         user = User.objects.get(email=email)
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
     @transaction.atomic
-    def delete_account(self):
+    def delete_account(self) -> bool:
         """
         Process account deletion (withdrawal) with a 30-day recovery period.
 
@@ -415,25 +342,18 @@ class CustomerAccountHandler:
         if not self.user:
             raise ValueError("User information is required to delete an account")
 
-        # 1. Invalidate all auth tokens
         self.user.authtoken_set.all().delete()
 
-        # 2. Mark user account for deletion
         self.user.is_active = False
         self.user.deletion_requested_at = timezone.now()
         self.user.save()
 
-        # # 3. Withdraw social login tokens(not delete)
-        # social_login_identifiers = self.user.socialloginidentifier_set.all()
-        # for social_login_identifier in social_login_identifiers:
-        #     SocialAuthHandler(social_login_identifier.provider).withdrawal(
-        #         social_login_identifier
-        #     )
+        # TODO: Re-enable social login token withdrawal when ready.
 
         return True
 
     @transaction.atomic
-    def recover_account(self):
+    def recover_account(self) -> bool:
         """
         Recover an account marked for deletion (within 30 days).
 
@@ -453,7 +373,7 @@ class CustomerAccountHandler:
             raise AccountNotMarkedForDeletion()
 
         # Check if the recovery period (30 days) has expired
-        thirty_days_ago = timezone.now() - datetime.timedelta(days=30)
+        thirty_days_ago = timezone.now() - timedelta(days=30)
         if self.user.deletion_requested_at < thirty_days_ago:
             raise RecoveryPeriodExpired()
 
@@ -466,11 +386,11 @@ class CustomerAccountHandler:
 
 
 class SocialAuthHandler:
-    def __init__(self, provider):
+    def __init__(self, provider: str | None) -> None:
         self.provider = provider
-        self.module: SocialAuthModule = self.get_module()
+        self.module: SocialAuthModule | None = self.get_module()
 
-    def get_module(self):
+    def get_module(self) -> SocialAuthModule | None:
         if self.provider == SocialLoginProviderChoices.google:
             return GoogleAuthModule()
         elif self.provider == SocialLoginProviderChoices.apple:
@@ -478,7 +398,7 @@ class SocialAuthHandler:
         else:
             return None
 
-    def check(self, access_token):
+    def check(self, access_token: str) -> tuple:
         """
         Validate social login information.
 
@@ -486,14 +406,12 @@ class SocialAuthHandler:
             access_token: Access token issued by the social login provider
 
         Returns:
-            social_uuid: Social login identifier
-            email: Social login email
-            is_new: Whether this is a new social signup (or existing email login)
+            Tuple of (social_uuid, email, is_new)
 
         Raises:
             TokenAuthenticationFailed: If token is invalid
         """
-        if self.provider == None:
+        if self.provider is None:
             raise ValueError("provider not found")
         identifier, email = self.module.check(access_token)
 
@@ -514,7 +432,6 @@ class SocialAuthHandler:
             social_login_identifier.temp_access_token = access_token[:100]
             social_login_identifier.save()
             return social_login_identifier.id, email, False
-        # Check if a user with the same email exists but not linked to this social identity
         elif email and User.objects.filter(email__iexact=email).exists():
             user = User.objects.get(email__iexact=email)
             social_login_identifier = SocialLoginIdentifier.objects.create(
@@ -522,11 +439,10 @@ class SocialAuthHandler:
                 identifier=identifier,
                 email=email,
                 temp_access_token=access_token[:100],
-                user=user,  # Link to existing user
+                user=user,
             )
-            return social_login_identifier.id, email, False  # Not a new user
+            return social_login_identifier.id, email, False
         else:
-            # New social login - create identifier without user (will be created during signup)
             social_login_identifier = SocialLoginIdentifier.objects.create(
                 provider=self.provider,
                 identifier=identifier,
@@ -538,12 +454,13 @@ class SocialAuthHandler:
     @transaction.atomic
     def create_user(
         self,
-        social_uuid,
-        access_token,
-        profile_name,
-        username,
-        bio,
-    ):
+        social_uuid: str,
+        access_token: str,
+        profile_name: str,
+        username: str,
+        bio: str,
+        **kwargs,
+    ) -> tuple[User, dict]:
         if not SocialLoginIdentifier.objects.filter(id=social_uuid).exists():
             raise SocialLoginIdentifierNotFound()
         social_login_identifier = SocialLoginIdentifier.objects.get(id=social_uuid)
@@ -568,21 +485,12 @@ class SocialAuthHandler:
         social_login_identifier.user = user
         social_login_identifier.save()
 
-        # is_prod = settings.ENV == "prod"
-        # if is_prod:
-        #     EmailService.send_template_email(
-        #         subject="Welcome to Essentory",
-        #         recipients=social_login_identifier.email,
-        #         template_name="welcome",
-        #         context={"profile_name": profile_name},
-        #         async_send=True,
-        #         language=language,
-        #     )
+        # TODO: Re-enable welcome email via EmailService when ready for production.
 
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
-    def login(self, social_uuid, access_token):
+    def login(self, social_uuid: str, access_token: str) -> tuple[User, dict]:
         if not SocialLoginIdentifier.objects.filter(id=social_uuid).exists():
             raise SocialLoginIdentifierNotFound()
         social_login_identifier = SocialLoginIdentifier.objects.get(id=social_uuid)
@@ -596,5 +504,5 @@ class SocialAuthHandler:
         token_value, expiry = CreateToken(user=user).create()
         return user, {"token_value": token_value, "expiry": expiry}
 
-    def withdrawal(self, social_login_identifier: SocialLoginIdentifier):
+    def withdrawal(self, social_login_identifier: SocialLoginIdentifier) -> None:
         self.module.withdrawal(social_login_identifier.identifier)
