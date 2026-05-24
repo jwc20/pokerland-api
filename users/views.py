@@ -6,7 +6,6 @@ from rest_framework.response import Response
 
 from auth_tokens.auth import StrictTokenAuthentication
 from users.serializers import (
-    UserDeleteAccountSerializer,
     UserEmailAvailabilityResponseSerializer,
     UserEmailAvailabilitySerializer,
     UserEmailCheckConfirmCodeResponseSerializer,
@@ -22,7 +21,6 @@ from users.serializers import (
     UserMyProfileUpdateSerializer,
     UsernameAvailabilityResponseSerializer,
     UsernameUpdateSerializer,
-    UserRecoverAccountSerializer,
     UserSocialCheckRequestSerializer,
     UserSocialCheckResponseSerializer,
     UserSocialSigninSerializer,
@@ -37,7 +35,6 @@ from utils.custom_swaggers.commons import (
 from utils.exceptions import (
     AccountNotMarkedForDeletion,
     AlreadyEnrolledEmail,
-    CannotBlockYourself,
     EmailVerificationCodeExpired,
     EmailVerificationRateLimited,
     InvalidLoginInfo,
@@ -48,7 +45,7 @@ from utils.exceptions import (
     SocialLoginIdentifierNotFound,
     SocialUserExists,
     TokenAuthenticationFailed,
-    UserDoesNotExist,
+    UsernameAlreadyTaken,
     UserTagUpdateRestricted,
 )
 from utils.paginations import ApiPageNumberPagination
@@ -534,7 +531,7 @@ class UserTagAvailabilityAPIView(GenericAPIView):
 class UserDeleteAccountAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = [StrictTokenAuthentication]
-    serializer_class = UserDeleteAccountSerializer
+    serializer_class = EmptySerializer
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_ACCOUNT,
@@ -592,7 +589,7 @@ class UserDeleteAccountAPIView(GenericAPIView):
 class UserRecoverAccountAPIView(GenericAPIView):
     permission_classes = [ApiPermission]
     authentication_classes = [StrictTokenAuthentication]
-    serializer_class = UserRecoverAccountSerializer
+    serializer_class = EmptySerializer
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_ACCOUNT,
@@ -649,7 +646,7 @@ class UserTagUpdateAPIView(GenericAPIView):
             api_exceptions=[
                 TokenAuthenticationFailed,
                 UserTagUpdateRestricted,
-                AlreadyEnrolledEmail,
+                UsernameAlreadyTaken,
             ],
         ),
     )
