@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     # custom apps
     "users",
     "auth_tokens",
+    "pokerlogs",
 ]
 
 
