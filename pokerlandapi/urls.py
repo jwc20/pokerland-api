@@ -5,6 +5,7 @@ from django.urls import path
 from pokerlandapi.views import (
     schema_view,
 )
+from pokerlogs.urls import urlpatterns as pokerlogs_urls
 from users.urls import urlpatterns as users_urls
 
 urlpatterns = [
@@ -17,3 +18,4 @@ urlpatterns = [
 ]
 
 urlpatterns += users_urls
+urlpatterns += pokerlogs_urls
