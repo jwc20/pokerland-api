@@ -30,7 +30,7 @@ class User(AbstractBaseUser):
 
     email = models.EmailField(unique=True)
     profile_name = models.CharField("Profile name", max_length=100, db_index=True)
-    username = models.CharField("Profile tag", max_length=100, db_index=True)
+    username = models.CharField("Profile tag", max_length=100, unique=True)
     username_changed_at = models.DateTimeField(
         "Profile tag changed at", default=timezone.now
     )
@@ -62,7 +62,7 @@ class CustomerManager(models.Manager):
         return (
             super()
             .get_queryset()
-            .filter(is_creator=False, is_staff=False, is_customer=True)
+            .filter(is_staff=False, is_customer=True)
         )
 
 
@@ -89,6 +89,11 @@ class ConfirmEmail(TimeStampedModel):
     email = models.EmailField()
     confirm_code = models.CharField("Verification code", max_length=6)
     is_confirmed = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "-created"], name="idx_confirmemail_email_created"),
+        ]
 
 
 class SocialLoginIdentifier(TimeStampedModel):

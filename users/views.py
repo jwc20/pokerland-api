@@ -48,7 +48,6 @@ from utils.exceptions import (
     UsernameAlreadyTaken,
     UserTagUpdateRestricted,
 )
-from utils.paginations import ApiPageNumberPagination
 from utils.permissions import ApiPermission
 
 from .serializers import (
@@ -76,6 +75,7 @@ class UserEmailLoginAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_AUTH_EMAIL,
+        operation_id="user_email_login",
         operation_summary="Login with email",
         operation_description="""
         ### Authentication and Authorization
@@ -112,6 +112,7 @@ class UserEmailSignupAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_AUTH_EMAIL,
+        operation_id="user_email_signup",
         operation_summary="Sign up with email (email verification required)",
         operation_description="""
         ### Authentication and Authorization
@@ -149,6 +150,7 @@ class MyProfileAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PROFILE,
+        operation_id="user_my_profile_get",
         operation_summary="Get my profile",
         operation_description="""
             ### Authentication and Authorization
@@ -176,6 +178,7 @@ class MyProfileUpdateAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PROFILE,
+        operation_id="user_my_profile_update",
         operation_summary="Update my profile",
         operation_description="""
         ### Authentication and Authorization
@@ -207,6 +210,7 @@ class UserLogoutAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_AUTH_EMAIL,
+        operation_id="user_logout",
         operation_summary="Logout",
         operation_description="""
         ### Authentication and Authorization
@@ -239,6 +243,7 @@ class UserEmailSendConfirmCodeAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_EMAIL_VERIFICATION,
+        operation_id="user_signup_email_send_confirm_code",
         operation_summary="Send verification code to submitted email",
         operation_description="""
         ### Authentication and Authorization
@@ -282,6 +287,7 @@ class UserEmailCheckConfirmCodeAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_EMAIL_VERIFICATION,
+        operation_id="user_signup_email_check_confirm_code",
         operation_summary="Verify code (always `000000` in non-prod environments)",
         operation_description="""
         ### Authentication and Authorization
@@ -322,6 +328,7 @@ class UserFindPwEmailSendConfirmCodeAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PASSWORD,
+        operation_id="user_find_pw_send_confirm_code",
         operation_summary="Send verification code for password reset",
         operation_description="""
         ### Authentication and Authorization
@@ -366,6 +373,7 @@ class UserFindPwEmailCheckConfirmCodeAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PASSWORD,
+        operation_id="user_find_pw_check_confirm_code",
         operation_summary="Verify password-reset code (always `000000` in non-prod)",
         operation_description="""
         ### Authentication and Authorization
@@ -420,6 +428,7 @@ class UserEmailResetPwAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PASSWORD,
+        operation_id="user_email_reset_pw",
         operation_summary="Reset password",
         operation_description="""
         ### Authentication and Authorization
@@ -461,6 +470,7 @@ class UserEmailAvailabilityAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_AUTH_EMAIL,
+        operation_id="user_check_email_availability",
         operation_summary="Check email availability",
         operation_description="""
         ### Authentication and Authorization
@@ -497,6 +507,7 @@ class UserTagAvailabilityAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_USERNAME,
+        operation_id="user_check_tag_availability",
         operation_summary="Check user tag availability",
         operation_description="""
         ### Authentication and Authorization
@@ -535,6 +546,7 @@ class UserDeleteAccountAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_ACCOUNT,
+        operation_id="user_delete_account",
         operation_summary="Delete account (withdrawal)",
         operation_description="""
         ### Authentication and Authorization
@@ -593,6 +605,7 @@ class UserRecoverAccountAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_ACCOUNT,
+        operation_id="user_recover_account",
         operation_summary="Recover account",
         operation_description="""
         ### Authentication and Authorization
@@ -631,6 +644,7 @@ class UserTagUpdateAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_USERNAME,
+        operation_id="user_tag_update",
         operation_summary="Change profile tag",
         operation_description="""
         ### Authentication and Authorization
@@ -670,6 +684,7 @@ class UserProfileAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_PROFILE,
+        operation_id="user_profile_get",
         operation_summary="Get user profile",
         operation_description="""
         ### Authentication and Authorization
@@ -699,6 +714,7 @@ class UserSocialCheckAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_SOCIAL_AUTH,
+        operation_id="user_social_check",
         operation_summary="Validate social login",
         operation_description="""
         ### Authentication and Authorization
@@ -744,6 +760,7 @@ class UserSocialSignupAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_SOCIAL_AUTH,
+        operation_id="user_social_signup",
         operation_summary="Social login signup",
         operation_description="""
         ### Authentication and Authorization
@@ -793,6 +810,7 @@ class UserSocialSigninAPIView(GenericAPIView):
 
     @custom_swagger_auto_schema(
         tags=SWAGGER_TAG_SOCIAL_AUTH,
+        operation_id="user_social_signin",
         operation_summary="Social login (existing user)",
         operation_description="""
         ### Authentication and Authorization

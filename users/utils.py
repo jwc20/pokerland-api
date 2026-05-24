@@ -1,5 +1,3 @@
-import datetime
-import logging
 import random
 from datetime import timedelta
 
@@ -375,7 +373,7 @@ class CustomerAccountHandler:
             raise AccountNotMarkedForDeletion()
 
         # Check if the recovery period (30 days) has expired
-        thirty_days_ago = timezone.now() - datetime.timedelta(days=30)
+        thirty_days_ago = timezone.now() - timedelta(days=30)
         if self.user.deletion_requested_at < thirty_days_ago:
             raise RecoveryPeriodExpired()
 
