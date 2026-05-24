@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 
-from utils.commons import SUCCESS_RESPONSE_DATA
 from utils.custom_swaggers.commons import (
     custom_swagger_auto_schema,
     get_swagger_response_dict,
