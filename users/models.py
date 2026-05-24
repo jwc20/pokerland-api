@@ -30,9 +30,9 @@ class User(AbstractBaseUser):
 
     email = models.EmailField(unique=True)
     profile_name = models.CharField("Profile name", max_length=100, db_index=True)
-    username = models.CharField("Profile tag", max_length=100, unique=True)
+    username = models.CharField("Username", max_length=100, unique=True)
     username_changed_at = models.DateTimeField(
-        "Profile tag changed at", default=timezone.now
+        "Username changed at", default=timezone.now
     )
     bio = models.CharField("Bio", max_length=255, default="")
     profile_image_url = models.URLField(
@@ -59,11 +59,7 @@ class User(AbstractBaseUser):
 
 class CustomerManager(models.Manager):
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .filter(is_staff=False, is_customer=True)
-        )
+        return super().get_queryset().filter(is_staff=False, is_customer=True)
 
 
 class Customer(User):
@@ -92,7 +88,9 @@ class ConfirmEmail(TimeStampedModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=["email", "-created"], name="idx_confirmemail_email_created"),
+            models.Index(
+                fields=["email", "-created"], name="idx_confirmemail_email_created"
+            ),
         ]
 
 
