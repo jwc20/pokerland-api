@@ -77,7 +77,7 @@ class CustomerEmailSignupAPIViewTestCase(TestCase):
             format="json",
             HTTP_app_version="1.0.1",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         response_data = response.json()
         self.assertIsNotNone(response_data.get("user", None))
         self.assertIsNotNone(response_data.get("token_info", None))
@@ -108,7 +108,7 @@ class MyProfileUpdateAPIViewTestCase(TestCase):
         profile_name = "Updated Name"
         username = "@after_change"
         token_value, _ = CreateToken(user=user).create()
-        response = APIClient().post(
+        response = APIClient().patch(
             reverse("user-my-profile-update"),
             {
                 "profile_name": profile_name,

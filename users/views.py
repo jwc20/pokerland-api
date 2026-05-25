@@ -123,7 +123,7 @@ class UserEmailSignupAPIView(GenericAPIView):
             api_exceptions=[
                 AlreadyEnrolledEmail,
             ],
-            success_response={status.HTTP_200_OK: UserSignupLoginResponseSerializer},
+            success_response={status.HTTP_201_CREATED: UserSignupLoginResponseSerializer},
         ),
         security=[{"api-key": {"type": "apiKey", "name": "api-key", "in": "header"}}],
     )
@@ -134,7 +134,7 @@ class UserEmailSignupAPIView(GenericAPIView):
             **serializer.validated_data
         ).email_signup()
         return Response(
-            status=status.HTTP_200_OK,
+            status=status.HTTP_201_CREATED,
             data=UserSignupLoginResponseSerializer(
                 {
                     "user": user,
@@ -191,7 +191,7 @@ class MyProfileUpdateAPIView(GenericAPIView):
             api_exceptions=[TokenAuthenticationFailed],
         ),
     )
-    def post(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = CustomerAccountHandler(user=request.user).update_profile(
