@@ -66,6 +66,7 @@ class BaseTokenAuthenticationMixin:
         current_expiry = auth_token.expiry
         new_expiry = timezone.now() + settings.AUTH_TOKEN_SETTING["TOKEN_TTL"]
         auth_token.expiry = new_expiry
+        auth_token.save(update_fields=["expiry"])
         # delta = (new_expiry - current_expiry).total_seconds()
         # if delta > settings.AUTH_TOKEN_SETTING["MIN_REFRESH_INTERVAL_SECOND"]:
         #     update_auth_token_expiry(auth_token.digest)

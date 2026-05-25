@@ -35,6 +35,7 @@ class UserEmailLoginSerializer(EmailNormalizationMixin, serializers.Serializer):
     password = serializers.RegexField(
         regex=PASSWORD_REGEX,
         min_length=8,
+        write_only=True,
         help_text=f"Must match the following regex: {PASSWORD_REGEX}",
     )
 
@@ -49,6 +50,7 @@ class UserEmailSignupSerializer(
     password = serializers.RegexField(
         regex=PASSWORD_REGEX,
         min_length=8,
+        write_only=True,
         help_text=f"Must match the following regex: {PASSWORD_REGEX}",
     )
     profile_name = serializers.CharField(
@@ -169,6 +171,7 @@ class UserEmailResetPwSerializer(EmailNormalizationMixin, serializers.Serializer
         regex=PASSWORD_REGEX,
         required=True,
         min_length=8,
+        write_only=True,
         help_text=f"New password. Must match: {PASSWORD_REGEX}",
     )
     email = serializers.EmailField(

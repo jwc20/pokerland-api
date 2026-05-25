@@ -9,11 +9,13 @@ class ApiPaginationSerializer(serializers.Serializer):
 
 class ModelUpdateSerializer(serializers.ModelSerializer):
     """
-    For update requests, treat all fields as required=False and allow_blank=True.
+    For update requests, treat all fields as required=False.
+    CharField subclasses also get allow_blank=True so empty strings are accepted.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
-            field.allow_blank = True
+            if isinstance(field, serializers.CharField):
+                field.allow_blank = True

@@ -103,7 +103,7 @@ USE_TZ = True
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.AcceptHeaderVersioning",
-    # "DEFAULT_PAGINATION_CLASS": "utils.paginations.ApiPageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "utils.paginations.ApiPageNumberPagination",
     "DEFAULT_AUTHENTICATION_CLASS": [
         "rest_framework.authentication.SessionAuthentication",
         "auth_tokens.auth.TokenAuthentication",
