@@ -119,6 +119,7 @@ SWAGGER_SETTINGS = {
         "Token": {"type": "apiKey", "name": "TOKEN", "in": "header"},
     },
     "USE_SESSION_AUTH": False,
+    "TRY_IT_OUT_ENABLED": True,
     "DEFAULT_PAGINATOR_INSPECTORS": [
         "utils.custom_swaggers.paginations.CustomDjangoRestResponsePagination",
     ],
