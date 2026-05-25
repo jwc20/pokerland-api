@@ -37,19 +37,3 @@ class SwaggerDocumentPermission(BasePermission):
             ip_address = request.META.get("REMOTE_ADDR")
 
         return ip_address in settings.ALLOWED_IP_ADDRESSES
-
-
-class ChannelSubscriberPermission(BasePermission):
-    """Channel subscriber permission."""
-
-    def has_permission(self, request, view):
-        # TODO - Add permission checks for users with channel access rights.
-
-        return True
-
-
-class ChannelAdminPermission(BasePermission):
-    """Channel admin permission."""
-
-    def has_permission(self, request, view):
-        return True
