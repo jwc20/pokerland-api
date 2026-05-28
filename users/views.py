@@ -123,13 +123,19 @@ class UserEmailSignupAPIView(GenericAPIView):
             api_exceptions=[
                 AlreadyEnrolledEmail,
             ],
-            success_response={status.HTTP_201_CREATED: UserSignupLoginResponseSerializer},
+            success_response={
+                status.HTTP_201_CREATED: UserSignupLoginResponseSerializer
+            },
         ),
         security=[{"api-key": {"type": "apiKey", "name": "api-key", "in": "header"}}],
     )
     def post(self, request, *args, **kwargs):
+        print(
+            "Signup request data:", request.data
+        )  # Debugging line to check incoming data
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        print(request.data)
         user, token_info = CustomerAccountHandler(
             **serializer.validated_data
         ).email_signup()
