@@ -89,6 +89,7 @@ class UserMyProfileResponseSerializer(serializers.ModelSerializer):
 class UserSignupLoginResponseSerializer(serializers.Serializer):
     user = UserMyProfileResponseSerializer()
     token_info = TokenResponseSerializer()
+    client_token = serializers.CharField(required=False)
 
 
 class UserMyProfileUpdateSerializer(ModelUpdateSerializer):

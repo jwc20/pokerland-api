@@ -130,7 +130,7 @@ class UserEmailSignupAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, token_info = CustomerAccountHandler(
+        user, token_info, client_token = CustomerAccountHandler(
             **serializer.validated_data
         ).email_signup()
         return Response(
@@ -139,6 +139,7 @@ class UserEmailSignupAPIView(GenericAPIView):
                 {
                     "user": user,
                     "token_info": token_info,
+                    "client_token": client_token,
                 }
             ).data,
         )
@@ -787,7 +788,7 @@ class UserSocialSignupAPIView(GenericAPIView):
         language = getattr(request, "language", "ko")
 
         social_auth_handler = SocialAuthHandler(None)
-        user, token_info = social_auth_handler.create_user(
+        user, token_info, client_token = social_auth_handler.create_user(
             language=language,
             **serializer.validated_data,
         )
@@ -798,6 +799,7 @@ class UserSocialSignupAPIView(GenericAPIView):
                 {
                     "user": user,
                     "token_info": token_info,
+                    "client_token": client_token,
                 }
             ).data,
         )

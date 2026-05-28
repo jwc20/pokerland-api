@@ -50,7 +50,7 @@ class CustomerAccountHandler:
         self.bio: str = kwargs.get("bio", "")
 
     @transaction.atomic
-    def email_signup(self) -> tuple[User, dict]:
+    def email_signup(self) -> tuple[User, dict, str]:
         email = self.email.lower() if self.email else None
         username = self.username.lower() if self.username else None
 
@@ -66,7 +66,8 @@ class CustomerAccountHandler:
             raise AlreadyEnrolledEmail()
 
         token_value, expiry = CreateToken(user=user).create()
-        return user, {"token_value": token_value, "expiry": expiry}
+        client_token = user.issue_client_token()
+        return user, {"token_value": token_value, "expiry": expiry}, client_token
 
     def login_id_duplicate_check(self) -> str:
         # TODO - Decide how withdrawn or dormant accounts should be handled.
@@ -128,8 +129,6 @@ class CustomerAccountHandler:
             and self.user.username_changed_at > thirty_one_days_ago
         ):
             raise UserTagUpdateRestricted()
-
-        old_username = self.user.username
 
         # Update the username and record the change time, then cascade to related content
         with transaction.atomic():
@@ -421,10 +420,10 @@ class SocialAuthHandler:
         # Check if the identifier already exists in our system
         if (
             SocialLoginIdentifier.objects.filter(identifier=identifier).exists()
-            and not SocialLoginIdentifier.objects.filter(identifier=identifier)
+            and SocialLoginIdentifier.objects.filter(identifier=identifier)
             .first()
             .user
-            is None
+            is not None
         ):
             social_login_identifier = SocialLoginIdentifier.objects.get(
                 identifier=identifier
@@ -460,7 +459,7 @@ class SocialAuthHandler:
         username: str,
         bio: str,
         **kwargs,
-    ) -> tuple[User, dict]:
+    ) -> tuple[User, dict, str]:
         if not SocialLoginIdentifier.objects.filter(id=social_uuid).exists():
             raise SocialLoginIdentifierNotFound()
         social_login_identifier = SocialLoginIdentifier.objects.get(id=social_uuid)
@@ -488,7 +487,8 @@ class SocialAuthHandler:
         # TODO: Re-enable welcome email via EmailService when ready for production.
 
         token_value, expiry = CreateToken(user=user).create()
-        return user, {"token_value": token_value, "expiry": expiry}
+        client_token = user.issue_client_token()
+        return user, {"token_value": token_value, "expiry": expiry}, client_token
 
     def login(self, social_uuid: str, access_token: str) -> tuple[User, dict]:
         if not SocialLoginIdentifier.objects.filter(id=social_uuid).exists():

@@ -115,10 +115,10 @@ class MyGameHistoryAPIView(ListAPIView):
             success_response={status.HTTP_200_OK: GameLogSerializer(many=True)},
             api_exceptions=[TokenAuthenticationFailed],
         ),
-        security=[
-            {"api-key": {"type": "apiKey", "name": "api-key", "in": "header"}},
-            {"Token": {"type": "apiKey", "name": "TOKEN", "in": "header"}},
-        ],
+        # security=[
+        #     {"api-key": {"type": "apiKey", "name": "api-key", "in": "header"}},
+        #     {"Token": {"type": "apiKey", "name": "TOKEN", "in": "header"}},
+        # ],
     )
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)

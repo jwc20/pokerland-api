@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -7,6 +9,17 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
 from utils.choices import SocialLoginProviderChoices
+
+
+CLIENT_TOKEN_PREFIX = "pokerland_"
+
+
+def generate_client_token() -> str:
+    return f"{CLIENT_TOKEN_PREFIX}{secrets.token_hex(32)}"
+
+
+def hash_client_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 class UserManager(BaseUserManager):
@@ -47,6 +60,9 @@ class User(AbstractBaseUser):
     deletion_requested_at = models.DateTimeField(
         "Deletion requested at", null=True, blank=True
     )
+    client_token_hash = models.CharField(
+        "Client token hash", max_length=64, unique=True, null=True, blank=True
+    )
 
     is_superuser = models.BooleanField("Is system admin", default=False)
     is_staff = models.BooleanField("Is staff", default=False)
@@ -55,6 +71,15 @@ class User(AbstractBaseUser):
     USERNAME_FIELD = "email"
 
     objects = UserManager()
+
+    def issue_client_token(self) -> str:
+        while True:
+            client_token = generate_client_token()
+            client_token_hash = hash_client_token(client_token)
+            if not User.objects.filter(client_token_hash=client_token_hash).exists():
+                self.client_token_hash = client_token_hash
+                self.save(update_fields=["client_token_hash"])
+                return client_token
 
 
 class CustomerManager(models.Manager):

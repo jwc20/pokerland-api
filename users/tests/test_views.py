@@ -7,12 +7,12 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from auth_tokens.utils import CreateToken
-from utils.exceptions import InvalidLoginInfo, RecoveryPeriodExpired
+from utils.exceptions import InvalidLoginInfo
 
 from ..factories import (
     CustomerFactory,
 )
-from ..models import Customer
+from ..models import CLIENT_TOKEN_PREFIX, Customer, hash_client_token
 
 
 class CustomerEmailLoginAPIViewTest(TestCase):
@@ -81,9 +81,14 @@ class CustomerEmailSignupAPIViewTestCase(TestCase):
         response_data = response.json()
         self.assertIsNotNone(response_data.get("user", None))
         self.assertIsNotNone(response_data.get("token_info", None))
+        client_token = response_data.get("client_token")
+        self.assertIsNotNone(client_token)
+        self.assertTrue(client_token.startswith(CLIENT_TOKEN_PREFIX))
         customer = Customer.objects.get(email=email)
         self.assertEqual(customer.username, username)
         self.assertEqual(customer.profile_name, profile_name)
+        self.assertEqual(customer.client_token_hash, hash_client_token(client_token))
+        self.assertNotEqual(customer.client_token_hash, client_token)
         self.assertFalse(customer.is_staff)
 
 
