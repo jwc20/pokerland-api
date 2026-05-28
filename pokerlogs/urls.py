@@ -1,12 +1,6 @@
 from django.urls import path
 
-from .views import (
-    AddGameAPIView,
-    AllGameLogsAPIView,
-    LogErrorsAPIView,
-    MyGameLogsAPIView,
-    UserGameLogsAPIView,
-)
+from .views import AddGameAPIView, LogErrorsAPIView
 
 urlpatterns = [
     path(
@@ -18,20 +12,5 @@ urlpatterns = [
         "log/log-errors",
         LogErrorsAPIView.as_view(),
         name="log-log-errors",
-    ),
-    path(
-        "log/my-game-logs",
-        MyGameLogsAPIView.as_view(),
-        name="log-my-game-logs",
-    ),
-    path(
-        "log/user/<str:username>/game-logs",
-        UserGameLogsAPIView.as_view(),
-        name="log-user-game-logs",
-    ),
-    path(
-        "log/all-game-logs",
-        AllGameLogsAPIView.as_view(),
-        name="log-all-game-logs",
     ),
 ]

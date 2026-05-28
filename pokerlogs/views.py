@@ -2,24 +2,18 @@ import gzip
 import json
 import logging
 
-from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 
-from auth_tokens.auth import StrictTokenAuthentication
 from utils.custom_swaggers.commons import (
     custom_swagger_auto_schema,
     get_swagger_response_dict,
 )
-from utils.exceptions import TokenAuthenticationFailed
-from utils.paginations import ApiPageNumberPagination
 from utils.permissions import ApiPermission
 
 from .models import ErrorLog, GameLog
 from .serializers import ErrorLogSerializer, GameLogSerializer
-
-User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
@@ -130,116 +124,3 @@ class LogErrorsAPIView(GenericAPIView):
             data=ErrorLogSerializer(error_log).data,
         )
 
-
-class UserGameLogsAPIView(GenericAPIView):
-    """Get game logs for a specific user by username."""
-
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = GameLogSerializer
-    pagination_class = ApiPageNumberPagination
-    page_size = 50
-
-    @custom_swagger_auto_schema(
-        tags=SWAGGER_TAG_POKERLOGS,
-        operation_id="get_user_game_logs",
-        operation_summary="Get game logs for a specific user by username",
-        operation_description="""
-        ### Authentication and Authorization
-        1. TOKEN header (required)
-        ---
-        Returns paginated game logs for the specified user.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: GameLogSerializer(many=True)},
-            api_exceptions=[TokenAuthenticationFailed],
-        ),
-    )
-    def get(self, request, username: str):
-        try:
-            user = User.objects.get(username__iexact=username)
-        except User.DoesNotExist:
-            return Response(
-                status=status.HTTP_404_NOT_FOUND,
-                data={"detail": f"User with username '{username}' not found."},
-            )
-
-        queryset = GameLog.objects.filter(user=user)
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = GameLogSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = GameLogSerializer(queryset, many=True)
-        return Response(data=serializer.data)
-
-
-class MyGameLogsAPIView(GenericAPIView):
-    """Get the authenticated user's own game logs."""
-
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = GameLogSerializer
-    pagination_class = ApiPageNumberPagination
-    page_size = 50
-
-    @custom_swagger_auto_schema(
-        tags=SWAGGER_TAG_POKERLOGS,
-        operation_id="get_my_game_logs",
-        operation_summary="Get your own game logs",
-        operation_description="""
-        ### Authentication and Authorization
-        1. TOKEN header (required)
-        ---
-        Returns paginated game logs for the authenticated user based on their token.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: GameLogSerializer(many=True)},
-            api_exceptions=[TokenAuthenticationFailed],
-        ),
-    )
-    def get(self, request):
-        queryset = GameLog.objects.filter(user=request.user)
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = GameLogSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = GameLogSerializer(queryset, many=True)
-        return Response(data=serializer.data)
-
-
-class AllGameLogsAPIView(GenericAPIView):
-    """Get game logs from all users."""
-
-    permission_classes = [ApiPermission]
-    authentication_classes = [StrictTokenAuthentication]
-    serializer_class = GameLogSerializer
-    pagination_class = ApiPageNumberPagination
-    page_size = 50
-
-    @custom_swagger_auto_schema(
-        tags=SWAGGER_TAG_POKERLOGS,
-        operation_id="get_all_game_logs",
-        operation_summary="Get game logs from all users",
-        operation_description="""
-        ### Authentication and Authorization
-        1. TOKEN header (required)
-        ---
-        Returns paginated game logs from all users. Requires authentication.
-        """,
-        responses=get_swagger_response_dict(
-            success_response={status.HTTP_200_OK: GameLogSerializer(many=True)},
-            api_exceptions=[TokenAuthenticationFailed],
-        ),
-    )
-    def get(self, request):
-        print("User making request to get all game logs:", request.user)
-        queryset = GameLog.objects.all()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = GameLogSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = GameLogSerializer(queryset, many=True)
-        return Response(data=serializer.data)
