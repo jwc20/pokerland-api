@@ -74,6 +74,7 @@ class UserMyProfileResponseSerializer(serializers.ModelSerializer):
         fields = [
             "email",
             "profile_name",
+            "client_token_hash",
             "username",
             "bio",
             "is_active",
@@ -102,7 +103,9 @@ class UserMyProfileUpdateSerializer(ModelUpdateSerializer):
         ]
 
 
-class UserEmailSendConfirmCodeSerializer(EmailNormalizationMixin, serializers.Serializer):
+class UserEmailSendConfirmCodeSerializer(
+    EmailNormalizationMixin, serializers.Serializer
+):
     email = serializers.EmailField(
         required=True,
         help_text="Email address to send the verification code to",
@@ -120,7 +123,9 @@ class UserEmailSendConfirmCodeResponseSerializer(serializers.Serializer):
     )
 
 
-class UserEmailCheckConfirmCodeSerializer(EmailNormalizationMixin, serializers.Serializer):
+class UserEmailCheckConfirmCodeSerializer(
+    EmailNormalizationMixin, serializers.Serializer
+):
     email = serializers.EmailField(
         required=True,
         help_text="Email address the verification code was sent to",
