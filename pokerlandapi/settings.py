@@ -14,7 +14,7 @@ SECRET_KEY = "django-insecure-0@%6ofi@er%=@4k25%lscf)w&isq*1%$sp4hhb@^4i9$#%b+7e
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "*",
+    "localhost",
 ]
 
 
@@ -106,7 +106,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.AcceptHeaderVersioning",
     "DEFAULT_PAGINATION_CLASS": "utils.paginations.ApiPageNumberPagination",
-    "DEFAULT_AUTHENTICATION_CLASS": [
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
         "auth_tokens.auth.OptionalTokenAuthentication",
     ],
@@ -146,13 +146,40 @@ AUTH_TOKEN_SETTING = {
     "EXPIRY_DATETIME_FORMAT": api_settings.DATETIME_FORMAT,
 }
 
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "token",
+]
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
 DEFAULT_PAGE_SIZE = 50
 EMAIL_VERIFICATION_CODE_EXPIRY_MINUTES = 3
 USE_IN_LOCAL = True
 
-ALLOWED_IP_ADDRESSES = [
-    "*",
-]
+# ALLOWED_IP_ADDRESSES = [
+#     "*",
+# ]
 
 ENV = "local"
 ALLOWED_VERSIONS = [
