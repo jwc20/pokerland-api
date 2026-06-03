@@ -43,6 +43,7 @@ class ClientLogSubmissionTest(TestCase):
         self.assertEqual(game_log.user, self.user)
         self.assertEqual(game_log.client, "pokerstars")
         self.assertEqual(game_log.client_version, "0.1.0")
+        self.assertEqual(game_log.client_token_hash, self.client_token_hash)
         self.assertEqual(game_log.payload, {"hand_id": "hand-1"})
         self.user.refresh_from_db()
         self.assertEqual(self.user.client_token_hash, self.client_token_hash)
@@ -158,14 +159,14 @@ class GameHistoryAPIViewTest(TestCase):
         token_value, _ = CreateToken(user=user).create()
         own_log = GameLog.objects.create(
             user=user,
-            token="own-token",
+            client_token_hash="own-token",
             client="desktop",
             client_version="1.0.0",
             payload={"hand_id": "own-hand"},
         )
         GameLog.objects.create(
             user=other_user,
-            token="other-token",
+            client_token_hash="other-token",
             client="desktop",
             client_version="1.0.0",
             payload={"hand_id": "other-hand"},
@@ -202,14 +203,14 @@ class GameHistoryAPIViewTest(TestCase):
         token_value, _ = CreateToken(user=staff).create()
         first_log = GameLog.objects.create(
             user=first_user,
-            token="first-token",
+            client_token_hash="first-token",
             client="desktop",
             client_version="1.0.0",
             payload={"hand_id": "first-hand"},
         )
         second_log = GameLog.objects.create(
             user=second_user,
-            token="second-token",
+            client_token_hash="second-token",
             client="desktop",
             client_version="1.0.0",
             payload={"hand_id": "second-hand"},

@@ -14,12 +14,10 @@ class GameLog(models.Model):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="game_logs", null=True, blank=True
     )
-    token = models.CharField("Auth token", max_length=255)
+    client_token_hash = models.CharField("Auth token", max_length=255)
     client = models.CharField("Client source", max_length=50)
     client_version = models.CharField("Client version", max_length=20)
-    submitted_at = models.DateTimeField(
-        "Client submitted at", null=True, blank=True
-    )
+    submitted_at = models.DateTimeField("Client submitted at", null=True, blank=True)
     payload = models.JSONField("Raw game payload")
     created_at = models.DateTimeField("Server received at", default=timezone.now)
 
@@ -27,7 +25,9 @@ class GameLog(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["-created_at"], name="idx_gamelog_created"),
-            models.Index(fields=["token"], name="idx_gamelog_token"),
+            models.Index(
+                fields=["client_token_hash"], name="idx_gamelog_client_token_hash"
+            ),
         ]
 
     def __str__(self):
@@ -44,9 +44,7 @@ class ErrorLog(models.Model):
     token = models.CharField("Auth token", max_length=255)
     client = models.CharField("Client source", max_length=50)
     client_version = models.CharField("Client version", max_length=20)
-    submitted_at = models.DateTimeField(
-        "Client submitted at", null=True, blank=True
-    )
+    submitted_at = models.DateTimeField("Client submitted at", null=True, blank=True)
     payload = models.JSONField("Raw error payload")
     created_at = models.DateTimeField("Server received at", default=timezone.now)
 

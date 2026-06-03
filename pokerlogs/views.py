@@ -81,15 +81,22 @@ def _extract_meta(data: dict) -> tuple[dict, dict]:
 class ClientTokenUserMixin:
     token_serializer_class = ClientTokenHashSerializer
 
-    def get_client_user(self, data):
-        serializer = self.token_serializer_class(data=data)
-        serializer.is_valid(raise_exception=True)
-        token_hash = serializer.validated_data["client_token_hash"]
+    def get_client_user_and_token_hash(self, data):
+        token_hash = self.get_client_token_hash(data)
 
         try:
-            return get_user_from_client_token_hash(token_hash)
+            return get_user_from_client_token_hash(token_hash), token_hash
         except User.DoesNotExist as exc:
             raise InvalidClientTokenHash from exc
+
+    def get_client_token_hash(self, data):
+        serializer = self.token_serializer_class(data=data)
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data["client_token_hash"]
+
+    def get_client_user(self, data):
+        user, _ = self.get_client_user_and_token_hash(data)
+        return user
 
 
 class AddGameAPIView(ClientTokenUserMixin, GenericAPIView):
@@ -119,11 +126,11 @@ class AddGameAPIView(ClientTokenUserMixin, GenericAPIView):
     def post(self, request, *args, **kwargs):
         data = _decode_gzip_body(request)
         meta, payload = _extract_meta(data)
-        user = self.get_client_user(data)
+        user, token_hash = self.get_client_user_and_token_hash(data)
 
         game_log = GameLog.objects.create(
             user=user,
-            token=meta.get("token") or "",
+            client_token_hash=token_hash,
             client=meta.get("client", ""),
             client_version=meta.get("client_version", ""),
             submitted_at=meta.get("submitted_at"),

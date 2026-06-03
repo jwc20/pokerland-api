@@ -20,7 +20,7 @@ class GameLogSerializer(serializers.ModelSerializer):
         model = GameLog
         fields = [
             "id",
-            "token",
+            "client_token_hash",
             "client",
             "client_version",
             "submitted_at",
@@ -36,7 +36,7 @@ class GameLogHistorySerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
-            "token",
+            "client_token_hash",
             "client",
             "client_version",
             "submitted_at",
