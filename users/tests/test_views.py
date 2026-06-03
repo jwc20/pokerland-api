@@ -12,7 +12,7 @@ from utils.exceptions import InvalidLoginInfo
 from ..factories import (
     CustomerFactory,
 )
-from ..models import CLIENT_TOKEN_PREFIX, Customer, hash_client_token
+from ..models import Customer, hash_client_token
 
 
 class CustomerEmailLoginAPIViewTest(TestCase):
@@ -83,7 +83,6 @@ class CustomerEmailSignupAPIViewTestCase(TestCase):
         self.assertIsNotNone(response_data.get("token_info", None))
         client_token = response_data.get("client_token")
         self.assertIsNotNone(client_token)
-        self.assertTrue(client_token.startswith(CLIENT_TOKEN_PREFIX))
         customer = Customer.objects.get(email=email)
         self.assertEqual(customer.username, username)
         self.assertEqual(customer.profile_name, profile_name)

@@ -74,7 +74,6 @@ class UserMyProfileResponseSerializer(serializers.ModelSerializer):
         fields = [
             "email",
             "profile_name",
-            "client_token_hash",
             "username",
             "bio",
             "is_active",

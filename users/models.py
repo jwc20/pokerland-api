@@ -11,11 +11,8 @@ from django_extensions.db.models import TimeStampedModel
 from utils.choices import SocialLoginProviderChoices
 
 
-CLIENT_TOKEN_PREFIX = "pokerland_"
-
-
 def generate_client_token() -> str:
-    return f"{CLIENT_TOKEN_PREFIX}{secrets.token_hex(32)}"
+    return secrets.token_hex(32)
 
 
 def hash_client_token(token: str) -> str:
@@ -61,7 +58,12 @@ class User(AbstractBaseUser):
         "Deletion requested at", null=True, blank=True
     )
     client_token_hash = models.CharField(
-        "Client token hash", max_length=64, unique=True, null=True, blank=True
+        "Client token hash",
+        max_length=64,
+        unique=True,
+        db_index=True,
+        null=True,
+        blank=True,
     )
 
     is_superuser = models.BooleanField("Is system admin", default=False)
@@ -71,6 +73,11 @@ class User(AbstractBaseUser):
     USERNAME_FIELD = "email"
 
     objects = UserManager()
+
+    def save(self, *args, **kwargs):
+        if self.client_token_hash:
+            self.client_token_hash = self.client_token_hash.lower()
+        super().save(*args, **kwargs)
 
     def issue_client_token(self) -> str:
         while True:

@@ -2,12 +2,15 @@ import gzip
 import json
 import logging
 
+from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, ParseError, PermissionDenied
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from auth_tokens.auth import StrictTokenAuthentication
+from users.client_tokens import get_user_from_client_token_hash
 from utils.custom_swaggers.commons import (
     custom_swagger_auto_schema,
     get_swagger_response_dict,
@@ -17,14 +20,33 @@ from utils.paginations import ApiPageNumberPagination
 from utils.permissions import ApiPermission
 
 from .models import ErrorLog, GameLog
-from .serializers import ErrorLogSerializer, GameLogHistorySerializer, GameLogSerializer
+from .serializers import (
+    ClientTokenHashSerializer,
+    ErrorLogSerializer,
+    GameLogHistorySerializer,
+    GameLogSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
 SWAGGER_TAG_POKERLOGS = ["Poker Logs"]
 
-# Keys injected by the client's _add_base_data(); stored in dedicated columns.
-_META_KEYS = {"token", "client", "client_version", "submitted_at"}
+# Keys injected by the client's _add_base_data(); stored in dedicated columns or
+# consumed for lookup rather than persisted in the payload.
+_META_KEYS = {
+    "token",
+    "client_token_hash",
+    "client",
+    "client_version",
+    "submitted_at",
+}
+User = get_user_model()
+
+
+class InvalidClientTokenHash(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "Invalid client_token_hash."
+    default_code = "invalid_client_token_hash"
 
 
 def _decode_gzip_body(request) -> dict:
@@ -35,11 +57,18 @@ def _decode_gzip_body(request) -> dict:
     we handle it manually here.
     """
     encoding = request.META.get("HTTP_CONTENT_ENCODING", "").lower()
-    if encoding == "gzip":
-        raw_body = gzip.decompress(request.body)
-    else:
-        raw_body = request.body
-    return json.loads(raw_body)
+    try:
+        if encoding == "gzip":
+            raw_body = gzip.decompress(request.body)
+        else:
+            raw_body = request.body
+        data = json.loads(raw_body)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ParseError("Invalid JSON request body.") from exc
+
+    if not isinstance(data, dict):
+        raise ParseError("Expected a JSON object.")
+    return data
 
 
 def _extract_meta(data: dict) -> tuple[dict, dict]:
@@ -49,11 +78,27 @@ def _extract_meta(data: dict) -> tuple[dict, dict]:
     return meta, payload
 
 
-class AddGameAPIView(GenericAPIView):
+class ClientTokenUserMixin:
+    token_serializer_class = ClientTokenHashSerializer
+
+    def get_client_user(self, data):
+        serializer = self.token_serializer_class(data=data)
+        serializer.is_valid(raise_exception=True)
+        token_hash = serializer.validated_data["client_token_hash"]
+
+        try:
+            return get_user_from_client_token_hash(token_hash)
+        except User.DoesNotExist as exc:
+            raise InvalidClientTokenHash from exc
+
+
+class AddGameAPIView(ClientTokenUserMixin, GenericAPIView):
     """Receive a completed hand payload from the desktop client."""
 
     permission_classes = [ApiPermission]
     authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "client_logs"
     serializer_class = GameLogSerializer
 
     @custom_swagger_auto_schema(
@@ -74,9 +119,11 @@ class AddGameAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         data = _decode_gzip_body(request)
         meta, payload = _extract_meta(data)
+        user = self.get_client_user(data)
 
         game_log = GameLog.objects.create(
-            token=meta.get("token", ""),
+            user=user,
+            token=meta.get("token") or "",
             client=meta.get("client", ""),
             client_version=meta.get("client_version", ""),
             submitted_at=meta.get("submitted_at"),
@@ -134,8 +181,8 @@ class GameHistoryAPIView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # if not (user.is_staff or user.is_superuser):
-        #     raise PermissionDenied("You do not have permission to view all game logs.")
+        if not (user.is_staff or user.is_superuser):
+            raise PermissionDenied("You do not have permission to view all game logs.")
         return GameLog.objects.all()
 
     @custom_swagger_auto_schema(
@@ -162,11 +209,13 @@ class GameHistoryAPIView(ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
-class LogErrorsAPIView(GenericAPIView):
+class LogErrorsAPIView(ClientTokenUserMixin, GenericAPIView):
     """Receive an error/debug payload from the desktop client."""
 
     permission_classes = [ApiPermission]
     authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "client_logs"
     serializer_class = ErrorLogSerializer
 
     @custom_swagger_auto_schema(
@@ -187,9 +236,11 @@ class LogErrorsAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         data = _decode_gzip_body(request)
         meta, payload = _extract_meta(data)
+        user = self.get_client_user(data)
 
         error_log = ErrorLog.objects.create(
-            token=meta.get("token", ""),
+            user=user,
+            token=meta.get("token") or "",
             client=meta.get("client", ""),
             client_version=meta.get("client_version", ""),
             submitted_at=meta.get("submitted_at"),

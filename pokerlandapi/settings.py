@@ -112,6 +112,9 @@ REST_FRAMEWORK = {
     ],
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
     "DATE_FORMAT": "%Y-%m-%d",
+    "DEFAULT_THROTTLE_RATES": {
+        "client_logs": "120/min",
+    },
 }
 
 SWAGGER_SETTINGS = {

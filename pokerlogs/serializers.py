@@ -3,6 +3,18 @@ from rest_framework import serializers
 from .models import ErrorLog, GameLog
 
 
+class ClientTokenHashSerializer(serializers.Serializer):
+    client_token_hash = serializers.RegexField(
+        regex=r"^[0-9a-fA-F]{64}$",
+        max_length=64,
+        min_length=64,
+        required=True,
+    )
+
+    def validate_client_token_hash(self, value):
+        return value.lower()
+
+
 class GameLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = GameLog
