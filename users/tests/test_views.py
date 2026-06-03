@@ -94,6 +94,7 @@ class CustomerEmailSignupAPIViewTestCase(TestCase):
 class MyProfileAPIViewTestCase(TestCase):
     def test_success(self):
         user = CustomerFactory()
+        user.issue_client_token()
         token_value, _ = CreateToken(user=user).create()
         response = APIClient().get(
             reverse("user-my-profile"),
@@ -104,6 +105,9 @@ class MyProfileAPIViewTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_user_data = response.json()
         self.assertEqual(response_user_data.get("email"), user.email)
+        self.assertEqual(
+            response_user_data.get("client_token_hash"), user.client_token_hash
+        )
 
 
 class MyProfileUpdateAPIViewTestCase(TestCase):

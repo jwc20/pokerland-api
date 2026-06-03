@@ -83,6 +83,7 @@ class UserMyProfileResponseSerializer(serializers.ModelSerializer):
             "is_customer",
             "password_changed_at",
             "deletion_requested_at",
+            "client_token_hash",
         ]
 
 
