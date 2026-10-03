@@ -1,0 +1,44 @@
+{
+  "base": {
+    "project_name": "pokerland-api",
+    "runtime": "python3.14",
+    "aws_region": "ap-northeast-2",
+    "profile_name": "[aws-profile-name]",
+    "s3_bucket": "[zappa-deployment-bucket]",
+    "exclude": [".env", ".env.*", "*.sqlite3", ".ruff_cache"]
+  },
+  "local": {
+    "extends": "base",
+    "django_settings": "pokerlandapi.settings",
+    "debug": true,
+    "log_level": "DEBUG",
+    "keep_warm": false,
+    "environment_variables": {
+      "DJANGO_ENV": "local"
+    }
+  },
+  "dev": {
+    "extends": "base",
+    "django_settings": "pokerlandapi.settings",
+    "debug": true,
+    "log_level": "INFO",
+    "keep_warm": false,
+    "remote_env": "s3://[zappa-deployment-bucket]/env/dev.json",
+    "environment_variables": {
+      "DJANGO_ENV": "dev"
+    }
+  },
+  "prod": {
+    "extends": "base",
+    "django_settings": "pokerlandapi.settings",
+    "debug": false,
+    "log_level": "WARNING",
+    "keep_warm": true,
+    "domain": "[api-domain-prod]",
+    "certificate_arn": "[acm-certificate-arn-prod]",
+    "remote_env": "s3://[zappa-deployment-bucket]/env/prod.json",
+    "environment_variables": {
+      "DJANGO_ENV": "prod"
+    }
+  }
+}

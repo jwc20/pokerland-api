@@ -1,17 +1,32 @@
+import os
 from datetime import timedelta
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Locally, variables come from .env (see .env.example). On Lambda, .env is not
+# packaged: Zappa sets DJANGO_ENV from zappa_settings.json and the rest from the
+# stage's remote_env file uploaded by scripts/deploy.py.
+load_dotenv(BASE_DIR / ".env")
+
+
+def env_list(name):
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
+# local | dev | prod
+DJANGO_ENV = os.environ["DJANGO_ENV"]
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-51(in8j$4ghd9&q=egwqur^@d_kvm1)=u5*w%=0m29eb(soy)v"
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = DJANGO_ENV == "local"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 
 
 # Application definition
@@ -35,7 +50,7 @@ INSTALLED_APPS = [
     # dj-rest-auth
     "dj_rest_auth",
     "dj_rest_auth.registration",
-    "corsheader",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
@@ -68,11 +83,7 @@ TEMPLATES = [
     },
 ]
 
-# Development
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
 
 CORS_ALLOW_CREDENTIALS = True  # Required for cookies
 
@@ -91,7 +102,7 @@ REST_AUTH = {
     "JWT_AUTH_COOKIE": "access-token",
     "JWT_AUTH_REFRESH_COOKIE": "refresh-token",
     "JWT_AUTH_HTTPONLY": True,
-    "JWT_AUTH_SECURE": False,  # Set True in production
+    "JWT_AUTH_SECURE": not DEBUG,  # HTTPS-only cookies outside local
     "JWT_AUTH_SAMESITE": "Lax",
     "JWT_AUTH_RETURN_EXPIRATION": True,
     "SESSION_LOGIN": False,
@@ -115,12 +126,26 @@ WSGI_APPLICATION = "pokerlandapi.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# PostgreSQL when DB_NAME is set. SQLite is for local development only: the
+# Lambda filesystem is read-only outside /tmp.
+if os.environ.get("DB_NAME"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["DB_NAME"],
+            "USER": os.environ.get("DB_USER", ""),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST": os.environ.get("DB_HOST", ""),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
