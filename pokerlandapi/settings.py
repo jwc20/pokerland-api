@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
     # Allauth
     "allauth",
     "allauth.account",
@@ -92,8 +93,28 @@ SITE_ID = 1
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
+        "pokerlandapi.authentication.JWTCookieAuthentication",
     ],
+    # Endpoints need a signed-in user unless they opt out with AllowAny, as the
+    # dj-rest-auth login, registration and token views do.
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# OpenAPI schema, served at /api/schema/ outside prod. pokerland-client generates
+# its typed API client from it with swagger-typescript-api (npm run generate:api).
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Pokerland API",
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # Separate request and response components, so read-only fields such as
+    # `pk` are not required in the client's request types.
+    "COMPONENT_SPLIT_REQUEST": True,
+    # Tag each operation with the path segment after /api/ (auth, ...). The
+    # client groups its generated API classes by that tag.
+    "SCHEMA_PATH_PREFIX": r"/api",
 }
 
 
@@ -115,10 +136,11 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-# Allauth configuration
-ACCOUNT_EMAIL_REQUIRED = False
+# Allauth configuration: sign up with a username, an optional email and a
+# password; log in with the username. (Fields marked * are required.)
+ACCOUNT_SIGNUP_FIELDS = ["username*", "email", "password1*", "password2*"]
+ACCOUNT_LOGIN_METHODS = {"username"}
 ACCOUNT_EMAIL_VERIFICATION = "none"
-# ACCOUNT_AUTHENTICATION_METHOD = "email"
 
 WSGI_APPLICATION = "pokerlandapi.wsgi.application"
 
