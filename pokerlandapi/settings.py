@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # Local
     "users",
+    "tracker",
 ]
 
 MIDDLEWARE = [
@@ -130,6 +131,28 @@ REST_AUTH = {
     "JWT_AUTH_RETURN_EXPIRATION": True,
     "SESSION_LOGIN": False,
 }
+
+# Tracker uploads (see pokerland-trackers/protocol/PROTOCOL.md). Chunks are
+# gzipped hand-history bytes; the compressed limit keeps a request within
+# Lambda's 6 MB payload once API Gateway has base64-encoded the body.
+TRACKER = {
+    "MIN_CLIENT_VERSION": os.environ.get("TRACKER_MIN_CLIENT_VERSION", "0.1.0"),
+    "MAX_CHUNK_BYTES": 4 * 1024 * 1024,
+    "MAX_UNCOMPRESSED_BYTES": 64 * 1024 * 1024,
+    "POLL_INTERVAL_SECONDS": 2,
+    "FLUSH_INTERVAL_SECONDS": 10,
+    "FLUSH_BYTES": 256 * 1024,
+    "MAX_READ_BYTES": 1024 * 1024,
+    # Raw chunks go to this S3 bucket; empty means a local directory (dev only:
+    # the Lambda filesystem is read-only).
+    "RAW_BUCKET": os.environ.get("TRACKER_RAW_BUCKET", ""),
+    "RAW_LOCAL_DIR": BASE_DIR / "var",
+    # A chunk unparsed for this long is picked up by tasks.sweep_stale_streams.
+    "STALE_CHUNK_SECONDS": 300,
+}
+
+# Chunk uploads are read as one body; Django's default (2.5 MB) would reject them.
+DATA_UPLOAD_MAX_MEMORY_SIZE = TRACKER["MAX_CHUNK_BYTES"] + 1024
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),

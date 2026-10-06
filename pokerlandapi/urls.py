@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/auth/registration/", RegisterView.as_view(), name="rest_register"),
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     path("api/users/", include("users.urls")),
+    path("api/tracker/", include("tracker.urls")),
 ]
 
 # The schema and Swagger UI describe every endpoint, so keep them out of prod.

@@ -11,7 +11,11 @@ urls.py imports this module, which registers the extensions.
 from dj_rest_auth.app_settings import api_settings as rest_auth_settings
 from dj_rest_auth.views import LoginView
 from drf_spectacular.contrib.rest_auth import SimpleJWTCookieScheme
-from drf_spectacular.extensions import OpenApiSerializerExtension, OpenApiViewExtension
+from drf_spectacular.extensions import (
+    OpenApiAuthenticationExtension,
+    OpenApiSerializerExtension,
+    OpenApiViewExtension,
+)
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 
@@ -64,3 +68,16 @@ class CookieTokenRefreshSerializerExtension(OpenApiSerializerExtension):
             access_expiration = serializers.DateTimeField(read_only=True)
 
         return auto_schema._map_serializer(Fixed, direction)
+
+
+class ClientTokenAuthenticationScheme(OpenApiAuthenticationExtension):
+    target_class = "tracker.authentication.ClientTokenAuthentication"
+    name = "clientToken"
+
+    def get_security_definition(self, auto_schema):
+        return {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Authorization",
+            "description": "`Token <client token>`, as the trackers send it.",
+        }

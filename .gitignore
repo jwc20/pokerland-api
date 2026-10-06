@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw tracker chunks stored locally (TRACKER_RAW_BUCKET empty)
+var/

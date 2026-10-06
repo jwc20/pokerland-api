@@ -5,7 +5,14 @@
     "aws_region": "ap-northeast-2",
     "profile_name": "[aws-profile-name]",
     "s3_bucket": "[zappa-deployment-bucket]",
-    "exclude": [".env", ".env.*", "*.sqlite3", ".ruff_cache"]
+    "exclude": [
+      ".env",
+      ".env.*",
+      "*.sqlite3",
+      ".ruff_cache",
+      "var"
+    ],
+    "timeout_seconds": 120
   },
   "local": {
     "extends": "base",
@@ -26,7 +33,13 @@
     "remote_env": "s3://[zappa-deployment-bucket]/env/dev.json",
     "environment_variables": {
       "DJANGO_ENV": "dev"
-    }
+    },
+    "events": [
+      {
+        "function": "tracker.tasks.sweep_stale_streams",
+        "expression": "rate(5 minutes)"
+      }
+    ]
   },
   "prod": {
     "extends": "base",
@@ -39,6 +52,12 @@
     "remote_env": "s3://[zappa-deployment-bucket]/env/prod.json",
     "environment_variables": {
       "DJANGO_ENV": "prod"
-    }
+    },
+    "events": [
+      {
+        "function": "tracker.tasks.sweep_stale_streams",
+        "expression": "rate(5 minutes)"
+      }
+    ]
   }
 }
