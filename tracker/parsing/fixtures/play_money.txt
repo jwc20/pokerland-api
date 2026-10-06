@@ -1,0 +1,239 @@
+﻿PokerStars Hand #262289806991:  Hold'em No Limit (100/200) - 2026/10/04 1:53:44 UTC [2026/10/03 21:53:44 ET]
+Table 'Naef V' 6-max (Play Money) Seat #5 is the button
+Seat 1: Ivan (8000 in chips) is sitting out
+Seat 2: Carol (18167 in chips) 
+Seat 3: Dave (57871 in chips) 
+Seat 4: Alice (20000 in chips) 
+Seat 5: Bob (21378 in chips) 
+Carol: posts small blind 100
+Dave: posts big blind 200
+Erin joins the table at seat #6 
+Alice: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Jc 5c]
+Alice: checks 
+Bob: raises 400 to 600
+Carol: calls 500
+Dave: calls 400
+Alice: calls 400
+*** FLOP *** [Kh 4d 9h]
+Carol: checks 
+Dave: checks 
+Alice: checks 
+Bob: bets 200
+Carol: folds 
+Dave: calls 200
+Alice: folds 
+*** TURN *** [Kh 4d 9h] [As]
+Dave: checks 
+Bob: bets 200
+Dave: folds 
+Uncalled bet (200) returned to Bob
+Bob collected 2646 from pot
+*** SUMMARY ***
+Total pot 2800 | Rake 154 
+Board [Kh 4d 9h As]
+Seat 1: Ivan
+Seat 2: Carol (small blind) folded on the Flop
+Seat 3: Dave (big blind) folded on the Turn
+Seat 4: Alice folded on the Flop
+Seat 5: Bob (button) collected (2646)
+
+
+
+PokerStars Hand #262289811345:  Hold'em No Limit (100/200) - 2026/10/04 1:54:25 UTC [2026/10/03 21:54:25 ET]
+Table 'Naef V' 6-max (Play Money) Seat #2 is the button
+Seat 1: Ivan (8000 in chips) 
+Seat 2: Carol (17567 in chips) 
+Seat 3: Dave (57071 in chips) 
+Seat 4: Alice (19400 in chips) 
+Seat 5: Bob (23224 in chips) 
+Seat 6: Erin (20000 in chips) 
+Dave: posts small blind 100
+Alice: posts big blind 200
+Erin: posts big blind 200
+Ivan: posts small & big blinds 300
+*** HOLE CARDS ***
+Dealt to Alice [9h Ts]
+Bob: calls 200
+Erin: checks 
+Ivan has timed out
+Ivan: checks 
+Carol: calls 200
+Dave: calls 100
+Alice: checks 
+*** FLOP *** [Ad 2h 3h]
+Dave: bets 200
+Alice: folds 
+Bob: folds 
+Erin: calls 200
+Ivan: raises 400 to 600
+Carol: calls 600
+Dave: calls 400
+Erin: calls 400
+*** TURN *** [Ad 2h 3h] [Jc]
+Dave: checks 
+Erin: checks 
+Ivan: bets 1748
+Carol: calls 1748
+Dave: calls 1748
+Erin: folds 
+*** RIVER *** [Ad 2h 3h Jc] [5c]
+Dave: checks 
+Ivan: bets 800
+Carol: calls 800
+Dave: calls 800
+*** SHOW DOWN ***
+Ivan: shows [3d 3c] (three of a kind, Threes)
+Carol: mucks hand 
+Dave: mucks hand 
+Ivan collected 10720 from pot
+*** SUMMARY ***
+Total pot 11344 | Rake 624 
+Board [Ad 2h 3h Jc 5c]
+Seat 1: Ivan showed [3d 3c] and won (10720) with three of a kind, Threes
+Seat 2: Carol (button) mucked [8h Jh]
+Seat 3: Dave (small blind) mucked [Ah Qh]
+Seat 4: Alice (big blind) folded on the Flop
+Seat 5: Bob folded on the Flop
+Seat 6: Erin folded on the Turn
+
+
+
+PokerStars Hand #262289818894:  Hold'em No Limit (100/200) - 2026/10/04 1:55:47 UTC [2026/10/03 21:55:47 ET]
+Table 'Naef V' 6-max (Play Money) Seat #3 is the button
+Seat 1: Ivan (15272 in chips) 
+Seat 2: Carol (14219 in chips) 
+Seat 3: Dave (53723 in chips) 
+Seat 4: Alice (19200 in chips) 
+Seat 5: Bob (23024 in chips) 
+Seat 6: Erin (19200 in chips) 
+Alice: posts small blind 100
+Bob: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Jd 8c]
+Erin: folds 
+Ivan: raises 200 to 400
+Carol: calls 400
+Dave: calls 400
+Alice: calls 300
+Bob: calls 200
+*** FLOP *** [Ts 6c Qc]
+Alice: checks 
+Bob: bets 1890
+Erin leaves the table
+Ivan: calls 1890
+Carol: folds 
+Dave: folds 
+Alice: folds 
+*** TURN *** [Ts 6c Qc] [7h]
+Bob: bets 5462
+Ivan: folds 
+Uncalled bet (5462) returned to Bob
+Bob collected 5462 from pot
+*** SUMMARY ***
+Total pot 5780 | Rake 318 
+Board [Ts 6c Qc 7h]
+Seat 1: Ivan folded on the Turn
+Seat 2: Carol folded on the Flop
+Seat 3: Dave (button) folded on the Flop
+Seat 4: Alice (small blind) folded on the Flop
+Seat 5: Bob (big blind) collected (5462)
+Seat 6: Erin folded before Flop (didn't bet)
+
+
+
+PokerStars Hand #262289822697:  Hold'em No Limit (100/200) - 2026/10/04 1:56:32 UTC [2026/10/03 21:56:32 ET]
+Table 'Naef V' 6-max (Play Money) Seat #4 is the button
+Seat 1: Ivan (12982 in chips) is sitting out
+Seat 2: Carol (13819 in chips) 
+Seat 3: Dave (53323 in chips) 
+Seat 4: Alice (18800 in chips) 
+Seat 5: Bob (26196 in chips) 
+Frank joins the table at seat #6 
+Bob: posts small blind 100
+Ivan: is sitting out 
+Carol: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Ac Kd]
+Dave: calls 200
+Alice: raises 700 to 900
+Bob: calls 800
+Carol: folds 
+Dave: calls 700
+*** FLOP *** [9d 9h 2h]
+Bob: checks 
+Dave: checks 
+Alice: bets 200
+Bob: calls 200
+Dave: folds 
+*** TURN *** [9d 9h 2h] [7h]
+Bob: checks 
+Alice: bets 1559
+Bob: calls 1559
+*** RIVER *** [9d 9h 2h 7h] [Th]
+Bob: bets 6065
+Alice: folds 
+Uncalled bet (6065) returned to Bob
+Bob collected 6065 from pot
+*** SUMMARY ***
+Total pot 6418 | Rake 353 
+Board [9d 9h 2h 7h Th]
+Seat 1: Ivan
+Seat 2: Carol (big blind) folded before Flop
+Seat 3: Dave folded on the Flop
+Seat 4: Alice (button) folded on the River
+Seat 5: Bob (small blind) collected (6065)
+
+
+
+PokerStars Hand #262289826745:  Hold'em No Limit (100/200) - 2026/10/04 1:57:22 UTC [2026/10/03 21:57:22 ET]
+Table 'Naef V' 6-max (Play Money) Seat #5 is the button
+Seat 1: Ivan (12982 in chips) is sitting out
+Seat 6: Frank (20000 in chips) is sitting out
+Seat 2: Carol (13619 in chips) 
+Seat 3: Dave (52423 in chips) 
+Seat 4: Alice (16141 in chips) 
+Seat 5: Bob (29602 in chips) 
+Carol: posts small blind 100
+Dave: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Kd 3s]
+Alice: calls 200
+Bob: calls 200
+Carol: calls 100
+Dave: checks 
+*** FLOP *** [9s 2d 2s]
+Carol: checks 
+Dave: checks 
+Alice: checks 
+Bob: checks 
+*** TURN *** [9s 2d 2s] [5d]
+Carol: checks 
+Dave: checks 
+Alice: checks 
+Bob: checks 
+*** RIVER *** [9s 2d 2s 5d] [Js]
+Carol: bets 800
+Dave: folds 
+Alice: raises 800 to 1600
+Bob: folds 
+Carol: raises 1200 to 2800
+Alice: raises 1200 to 4000
+Carol: calls 1200
+*** SHOW DOWN ***
+Alice: shows [Kd 3s] (a pair of Deuces)
+Carol: shows [2c Ad] (three of a kind, Deuces)
+Carol collected 8316 from pot
+*** SUMMARY ***
+Total pot 8800 | Rake 484 
+Board [9s 2d 2s 5d Js]
+Seat 1: Ivan
+Seat 6: Frank
+Seat 2: Carol (small blind) showed [2c Ad] and won (8316) with three of a kind, Deuces
+Seat 3: Dave (big blind) folded on the River
+Seat 4: Alice showed [Kd 3s] and lost with a pair of Deuces
+Seat 5: Bob (button) folded on the River
+
+
+

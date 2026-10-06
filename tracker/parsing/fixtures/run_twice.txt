@@ -1,0 +1,38 @@
+PokerStars Hand #219600000003:  Hold'em No Limit ($1/$2 USD) - 2020/09/24 20:00:00 ET
+Table 'Halley' 6-max Seat #1 is the button
+Seat 1: Alice ($200 in chips)
+Seat 2: Bob ($150 in chips)
+Seat 3: Carol ($300 in chips)
+Bob: posts small blind $1
+Carol: posts big blind $2
+*** HOLE CARDS ***
+Dealt to Alice [Kh Ks]
+Alice: raises $4 to $6
+Bob: raises $144 to $150 and is all-in
+Carol: folds
+Alice: calls $144
+*** FIRST FLOP *** [Td 3c 7h]
+*** FIRST TURN *** [Td 3c 7h] [Kd]
+*** FIRST RIVER *** [Td 3c 7h Kd] [2s]
+*** SECOND FLOP *** [6c Qc 8d]
+*** SECOND TURN *** [6c Qc 8d] [Ah]
+*** SECOND RIVER *** [6c Qc 8d Ah] [3d]
+*** FIRST SHOW DOWN ***
+Bob: shows [Ac Ad] (a pair of Aces)
+Alice: shows [Kh Ks] (three of a kind, Kings)
+Alice collected $149.25 from pot
+*** SECOND SHOW DOWN ***
+Bob: shows [Ac Ad] (three of a kind, Aces)
+Alice: shows [Kh Ks] (a pair of Kings)
+Bob collected $149.25 from pot
+*** SUMMARY ***
+Total pot $302 | Rake $3.50
+Hand was run twice
+FIRST Board [Td 3c 7h Kd 2s]
+SECOND Board [6c Qc 8d Ah 3d]
+Seat 1: Alice (button) showed [Kh Ks] and won ($149.25) with three of a kind, Kings
+Seat 2: Bob (small blind) showed [Ac Ad] and won ($149.25) with three of a kind, Aces
+Seat 3: Carol (big blind) folded before Flop
+
+
+

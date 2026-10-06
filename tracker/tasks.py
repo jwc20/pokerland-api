@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 from zappa.asynchronous import task
 
+from hands.store import store_hands
 from tracker import parsing
 from tracker.models import LogChunk, LogStream
 from tracker.storage import raw_storage
@@ -26,7 +27,7 @@ def process_stream(stream_pk):
 
 
 def drain(stream_pk):
-    """Parses every chunk that continues from the stream's parsed offset, in order.
+    """Parses every chunk that continues from the stream's parsed offset, in order, and saves its hands.
 
     The stream row is locked while a chunk is parsed, so concurrent invocations
     (two uploads, or an upload and the sweeper) queue up instead of parsing the
@@ -41,7 +42,9 @@ def drain(stream_pk):
                 return
             try:
                 data = gzip.decompress(raw_storage().get(chunk.storage_key))
-                state = parsing.parse(data, stream.parser_state)
+                state, hands = parsing.parse(data, stream.parser_state)
+                with transaction.atomic():  # a savepoint, so a failed write still lets the chunk be marked failed
+                    store_hands(stream, hands)
             except Exception as error:
                 logger.exception("Parsing chunk %s failed", chunk)
                 chunk.status = LogChunk.Status.FAILED

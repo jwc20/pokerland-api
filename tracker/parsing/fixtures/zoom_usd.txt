@@ -1,0 +1,41 @@
+PokerStars Zoom Hand #219396263497:  Hold'em No Limit ($0.05/$0.10) - 2020/09/22 15:42:13 CET [2020/09/22 9:42:13 ET]
+Table 'Donati' 6-max Seat #1 is the button
+Seat 1: Bob ($10.37 in chips)
+Seat 2: Carol ($9.80 in chips)
+Seat 3: Alice ($10 in chips)
+Seat 4: Dave ($12.15 in chips)
+Seat 5: Erin ($4.02 in chips)
+Seat 6: Frank ($10.55 in chips)
+Carol: posts small blind $0.05
+Alice: posts big blind $0.10
+*** HOLE CARDS ***
+Dealt to Alice [Ah Kd]
+Dave: folds
+Erin: raises $0.20 to $0.30
+Frank: folds
+Bob: folds
+Carol: folds
+Alice: raises $0.80 to $1.10
+Erin: calls $0.80
+*** FLOP *** [Kc 7d 2s]
+Alice: bets $1.25
+Erin: raises $1.67 to $2.92 and is all-in
+Alice: calls $1.67
+*** TURN *** [Kc 7d 2s] [9h]
+*** RIVER *** [Kc 7d 2s 9h] [3c]
+*** SHOW DOWN ***
+Alice: shows [Ah Kd] (a pair of Kings)
+Erin: shows [Qs Qh] (a pair of Queens)
+Alice collected $7.85 from pot
+*** SUMMARY ***
+Total pot $8.09 | Rake $0.24
+Board [Kc 7d 2s 9h 3c]
+Seat 1: Bob (button) folded before Flop (didn't bet)
+Seat 2: Carol (small blind) folded before Flop
+Seat 3: Alice (big blind) showed [Ah Kd] and won ($7.85) with a pair of Kings
+Seat 4: Dave folded before Flop (didn't bet)
+Seat 5: Erin showed [Qs Qh] and lost with a pair of Queens
+Seat 6: Frank folded before Flop (didn't bet)
+
+
+

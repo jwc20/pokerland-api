@@ -1,0 +1,35 @@
+PokerStars Hand #219400000001: Tournament #2981073415, $0.98+$0.12 USD Hold'em No Limit - Level III (25/50) - 2020/09/22 21:05:00 ET
+Table '2981073415 1' 9-max Seat #2 is the button
+Seat 2: Alice (1490 in chips)
+Seat 5: Bob (2310 in chips)
+Seat 7: Carol (640 in chips)
+Alice: posts the ante 5
+Bob: posts the ante 5
+Carol: posts the ante 5
+Bob: posts small blind 25
+Carol: posts big blind 50
+*** HOLE CARDS ***
+Dealt to Alice [8s 8h]
+Alice: raises 100 to 150
+Bob: raises 2155 to 2305 and is all-in
+Carol: calls 585 and is all-in
+Alice: calls 1335 and is all-in
+Uncalled bet (820) returned to Bob
+*** FLOP *** [2c 8d Kh]
+*** TURN *** [2c 8d Kh] [Ks]
+*** RIVER *** [2c 8d Kh Ks] [4c]
+*** SHOW DOWN ***
+Bob: shows [Ac Kc] (three of a kind, Kings)
+Alice: shows [8s 8h] (a full house, Eights full of Kings)
+Alice collected 1700 from side pot
+Carol: shows [Qd Jd] (a pair of Kings)
+Alice collected 1920 from main pot
+*** SUMMARY ***
+Total pot 3620 Main pot 1920. Side pot 1700. | Rake 0
+Board [2c 8d Kh Ks 4c]
+Seat 2: Alice (button) showed [8s 8h] and won (3620) with a full house, Eights full of Kings
+Seat 5: Bob (small blind) showed [Ac Kc] and lost with three of a kind, Kings
+Seat 7: Carol (big blind) showed [Qd Jd] and lost with a pair of Kings
+
+
+

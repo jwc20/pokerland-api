@@ -1,0 +1,19 @@
+PokerStars Hand #219700000004:  Hold'em No Limit (10/20) - 2020/09/25 12:00:00 UTC [2020/09/25 8:00:00 ET]
+Table 'Mira' 2-max (Play Money) Seat #1 is the button
+Seat 1: Alice (2000 in chips)
+Seat 2: Bob (2000 in chips)
+Alice: posts small blind 10
+Bob: posts big blind 20
+*** HOLE CARDS ***
+Dealt to Alice [7c 2d]
+Alice: folds
+Uncalled bet (10) returned to Bob
+Bob collected 20 from pot
+Bob: doesn't show hand
+*** SUMMARY ***
+Total pot 20 | Rake 0
+Seat 1: Alice (button) (small blind) folded before Flop
+Seat 2: Bob (big blind) collected (20)
+
+
+

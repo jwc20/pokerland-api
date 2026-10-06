@@ -6,12 +6,14 @@ from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
+from hands.models import Hand
 from pokerlandapi.tests import register
-from tracker import tasks
+from tracker import parsing, tasks
 from tracker.models import LogChunk, LogStream
 from tracker.tests_support import HAND, STREAM_ID, UA, register_stream, upload
 
@@ -230,8 +232,46 @@ class DrainTests(TrackerTests):
 
         self.stream.refresh_from_db()
         self.assertEqual(self.stream.parsed_offset, 3 * len(HAND))
-        self.assertEqual(self.stream.parser_state, {"hands_seen": 3, "bytes_seen": 3 * len(HAND)})
-        self.assertEqual(self.stream.parser_version, 1)
+        self.assertEqual(
+            self.stream.parser_state,
+            {"hands_seen": 3, "hands_failed": 0, "bytes_seen": 3 * len(HAND), "partial": ""},
+        )
+        self.assertEqual(self.stream.parser_version, parsing.PARSER_VERSION)
+
+    def test_parsed_hands_are_saved_for_the_streams_user(self):
+        self.upload_without_parsing(0, HAND)
+
+        tasks.drain(self.stream.pk)
+
+        hand = Hand.objects.get()
+        self.assertEqual((hand.user, hand.stream, hand.hand_id), (self.user, self.stream, "260883422541"))
+
+    def test_a_hand_split_across_chunks_is_saved_once_it_is_complete(self):
+        cut = HAND.index(b"*** SUMMARY ***")
+        self.upload(0, HAND[:cut])
+        self.assertFalse(Hand.objects.exists())
+
+        self.upload(cut, HAND[cut:])
+
+        self.assertEqual(Hand.objects.count(), 1)
+
+    def test_reparsing_updates_hands_in_place(self):
+        self.upload(0, HAND)
+        hand = Hand.objects.get()
+
+        tasks.reparse(self.stream.pk)
+        tasks.drain(self.stream.pk)
+
+        self.assertEqual(Hand.objects.get().pk, hand.pk)  # replay links stay valid
+
+    def test_a_failed_save_marks_the_chunk_failed(self):
+        self.upload_without_parsing(0, HAND)
+
+        with mock.patch("tracker.tasks.store_hands", side_effect=IntegrityError("boom")):
+            tasks.drain(self.stream.pk)
+
+        self.assertEqual(list(self.stream.chunks.values_list("status", "error")), [("failed", "IntegrityError: boom")])
+        self.assertFalse(Hand.objects.exists())
 
     def test_a_parser_crash_marks_the_chunk_failed_and_stops(self):
         self.upload_without_parsing(0, HAND)

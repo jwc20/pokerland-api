@@ -1,0 +1,34 @@
+PokerStars Hand #219500000002:  Omaha Pot Limit (€0.02/€0.05 EUR) - 2020/09/23 10:00:00 CET [2020/09/23 4:00:00 ET]
+Table 'Achelois II' 4-max Seat #4 is the button
+Seat 1: Alice (€5 in chips)
+Seat 2: Bob (€6.40 in chips)
+Seat 3: Carol (€2.10 in chips) is sitting out
+Seat 4: Dave (€5.25 in chips)
+Alice: posts small blind €0.02
+Bob: posts big blind €0.05
+*** HOLE CARDS ***
+Dealt to Alice [Ah As 7d 6c]
+Dave: raises €0.10 to €0.15
+Alice: calls €0.13
+Bob: folds
+*** FLOP *** [Ad Kc 5h]
+Alice: checks
+Dave: bets €0.20
+Alice: raises €0.60 to €0.80
+Dave: calls €0.60
+*** TURN *** [Ad Kc 5h] [2d]
+Alice: bets €1.50
+Dave: folds
+Uncalled bet (€1.50) returned to Alice
+Alice collected €1.86 from pot
+Alice: doesn't show hand
+*** SUMMARY ***
+Total pot €1.95 | Rake €0.09
+Board [Ad Kc 5h 2d]
+Seat 1: Alice (small blind) collected (€1.86)
+Seat 2: Bob (big blind) folded before Flop
+Seat 3: Carol
+Seat 4: Dave (button) folded on the Turn
+
+
+

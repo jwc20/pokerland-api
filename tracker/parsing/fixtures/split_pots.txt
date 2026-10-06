@@ -1,0 +1,32 @@
+PokerStars Hand #219800000005:  Hold'em No Limit (100/200) - 2026/10/04 2:00:00 UTC [2026/10/03 22:00:00 ET]
+Table 'Lyra III' 6-max (Play Money) Seat #1 is the button
+Seat 1: Alice (10000 in chips)
+Seat 2: Bob (3000 in chips)
+Seat 3: Carol (10000 in chips)
+Bob: posts small blind 100
+Carol: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Qc Qd]
+Alice: raises 400 to 600
+Bob: raises 2400 to 3000 and is all-in
+Carol: calls 2800
+Alice: raises 7000 to 10000 and is all-in
+Carol: calls 7000 and is all-in
+*** FLOP *** [2c 7d Js]
+*** TURN *** [2c 7d Js] [4h]
+*** RIVER *** [2c 7d Js 4h] [9s]
+*** SHOW DOWN ***
+Alice: shows [Qc Qd] (a pair of Queens)
+Carol: shows [Kh Kd] (a pair of Kings)
+Carol collected 13230 from side pot
+Bob: shows [Ac Ad] (a pair of Aces)
+Bob collected 8505 from main pot
+*** SUMMARY ***
+Total pot 23000 Main pot 8505. Side pot 13230. | Rake 1265
+Board [2c 7d Js 4h 9s]
+Seat 1: Alice (button) showed [Qc Qd] and lost with a pair of Queens
+Seat 2: Bob (small blind) showed [Ac Ad] and won (8505) with a pair of Aces
+Seat 3: Carol (big blind) showed [Kh Kd] and won (13230) with a pair of Kings
+
+
+

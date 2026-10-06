@@ -6,10 +6,21 @@ import uuid
 
 HAND = (
     "﻿PokerStars Hand #260883422541:  Hold'em No Limit (100/200) - 2026/05/21 18:31:27 UTC\n"
-    "Table 'Gertrud VIII' 6-max (Play Money) Seat #2 is the button\n"
+    "Table 'Gertrud VIII' 6-max (Play Money) Seat #1 is the button\n"
     "Seat 1: Alice (20000 in chips)\n"
+    "Seat 2: Bob (20000 in chips)\n"
+    "Alice: posts small blind 100\n"
+    "Bob: posts big blind 200\n"
+    "*** HOLE CARDS ***\n"
+    "Dealt to Alice [Ah Kd]\n"
+    "Alice: folds\n"
+    "Uncalled bet (100) returned to Bob\n"
+    "Bob collected 200 from pot\n"
+    "Bob: doesn't show hand\n"
     "*** SUMMARY ***\n"
-    "Total pot 400 | Rake 0\n"
+    "Total pot 200 | Rake 0\n"
+    "Seat 1: Alice (button) (small blind) folded before Flop\n"
+    "Seat 2: Bob (big blind) collected (200)\n"
     "\n\n\n\n"
 ).encode()
 FIRST_LINE = HAND.split(b"\n", 1)[0] + b"\n"

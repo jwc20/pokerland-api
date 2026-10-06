@@ -1,0 +1,178 @@
+﻿PokerStars Hand #262289593035:  Hold'em No Limit (100/200) - 2026/10/04 1:21:16 UTC [2026/10/03 21:21:16 ET]
+Table 'Sequoia V' 6-max (Play Money) Seat #3 is the button
+Seat 2: Grace (19600 in chips) is sitting out
+Seat 1: Alice (20000 in chips) 
+Seat 3: Heidi (5144 in chips) 
+Seat 4: Judy (25797 in chips) 
+Seat 5: Mallory (4245 in chips) 
+Seat 6: Niaj (31032 in chips) 
+Judy: posts small blind 100
+Mallory: posts big blind 200
+Alice: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Th 7s]
+Niaj: folds 
+Alice: checks 
+Heidi: raises 4944 to 5144 and is all-in
+Judy: folds 
+Mallory: calls 4045 and is all-in
+Alice: folds 
+Uncalled bet (899) returned to Heidi
+*** FLOP *** [3h Jh 4c]
+*** TURN *** [3h Jh 4c] [8s]
+*** RIVER *** [3h Jh 4c 8s] [4h]
+*** SHOW DOWN ***
+Mallory: shows [3c 5c] (two pair, Fours and Threes)
+Heidi: shows [Ad 6h] (a pair of Fours)
+Mallory collected 8307 from pot
+*** SUMMARY ***
+Total pot 8790 | Rake 483 
+Board [3h Jh 4c 8s 4h]
+Seat 2: Grace
+Seat 1: Alice folded before Flop (didn't bet)
+Seat 3: Heidi (button) showed [Ad 6h] and lost with a pair of Fours
+Seat 4: Judy (small blind) folded before Flop
+Seat 5: Mallory (big blind) showed [3c 5c] and won (8307) with two pair, Fours and Threes
+Seat 6: Niaj folded before Flop (didn't bet)
+
+
+
+PokerStars Hand #262289596277:  Hold'em No Limit (100/200) - 2026/10/04 1:21:44 UTC [2026/10/03 21:21:44 ET]
+Table 'Sequoia V' 6-max (Play Money) Seat #4 is the button
+Seat 2: Grace (19600 in chips) is sitting out
+Seat 1: Alice (19800 in chips) 
+Seat 3: Heidi (899 in chips) 
+Seat 4: Judy (25697 in chips) 
+Seat 5: Mallory (8307 in chips) 
+Seat 6: Niaj (31032 in chips) 
+Mallory: posts small blind 100
+Niaj: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Kd 9d]
+Alice: calls 200
+Heidi: raises 699 to 899 and is all-in
+Judy: calls 899
+Mallory: calls 799
+Niaj: calls 699
+Alice: calls 699
+*** FLOP *** [Qs As 2c]
+Mallory: bets 2124
+Niaj: calls 2124
+Alice: folds 
+Judy: folds 
+*** TURN *** [Qs As 2c] [6d]
+Mallory: bets 5284 and is all-in
+Niaj: calls 5284
+*** RIVER *** [Qs As 2c 6d] [3d]
+*** SHOW DOWN ***
+Mallory: shows [5h 4c] (a straight, Deuce to Six)
+Niaj: shows [7s Qh] (a pair of Queens)
+Mallory collected 14001 from side pot
+Heidi: shows [Ts 8c] (high card Ace)
+Mallory collected 4248 from main pot
+*** SUMMARY ***
+Total pot 19311 Main pot 4248. Side pot 14001. | Rake 1062 
+Board [Qs As 2c 6d 3d]
+Seat 2: Grace
+Seat 1: Alice folded on the Flop
+Seat 3: Heidi showed [Ts 8c] and lost with high card Ace
+Seat 4: Judy (button) folded on the Flop
+Seat 5: Mallory (small blind) showed [5h 4c] and won (18249) with a straight, Deuce to Six
+Seat 6: Niaj (big blind) showed [7s Qh] and lost with a pair of Queens
+
+
+
+PokerStars Hand #262289601365:  Hold'em No Limit (100/200) - 2026/10/04 1:22:28 UTC [2026/10/03 21:22:28 ET]
+Table 'Sequoia V' 6-max (Play Money) Seat #5 is the button
+Seat 3: Heidi (0 in chips) is sitting out
+Seat 1: Alice (18901 in chips) 
+Seat 2: Grace (19600 in chips) 
+Seat 4: Judy (24798 in chips) 
+Seat 5: Mallory (18249 in chips) 
+Seat 6: Niaj (22725 in chips) 
+Niaj: posts small blind 100
+Alice: posts big blind 200
+Grace: posts small & big blinds 300
+*** HOLE CARDS ***
+Dealt to Alice [2h Kc]
+Heidi is disconnected 
+Grace: checks 
+Judy: calls 200
+Mallory: calls 200
+Niaj: calls 100
+Alice: checks 
+*** FLOP *** [Qs Kd Ts]
+Niaj: checks 
+Alice: bets 200
+Grace: calls 200
+Judy: calls 200
+Mallory: calls 200
+Niaj: folds 
+*** TURN *** [Qs Kd Ts] [3c]
+Alice: checks 
+Grace: checks 
+Judy: checks 
+Mallory: bets 897
+Alice: calls 897
+Grace: folds 
+Judy: calls 897
+*** RIVER *** [Qs Kd Ts 3c] [7d]
+Alice: bets 200
+Judy: folds 
+Mallory: calls 200
+*** SHOW DOWN ***
+Alice: shows [2h Kc] (a pair of Kings)
+Mallory: mucks hand 
+Alice collected 4716 from pot
+*** SUMMARY ***
+Total pot 4991 | Rake 275 
+Board [Qs Kd Ts 3c 7d]
+Seat 3: Heidi
+Seat 1: Alice (big blind) showed [2h Kc] and won (4716) with a pair of Kings
+Seat 2: Grace folded on the Turn
+Seat 4: Judy folded on the River
+Seat 5: Mallory (button) mucked [As Tc]
+Seat 6: Niaj (small blind) folded on the Flop
+
+
+
+PokerStars Hand #262289607882:  Hold'em No Limit (100/200) - 2026/10/04 1:23:25 UTC [2026/10/03 21:23:25 ET]
+Table 'Sequoia V' 6-max (Play Money) Seat #6 is the button
+Seat 3: Heidi (0 in chips) is sitting out
+Seat 1: Alice (22120 in chips) 
+Seat 2: Grace (19100 in chips) 
+Seat 4: Judy (23501 in chips) 
+Seat 5: Mallory (16752 in chips) 
+Seat 6: Niaj (22525 in chips) 
+Alice: posts small blind 100
+Grace: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [7d As]
+Judy: calls 200
+Mallory: calls 200
+Niaj: calls 200
+Alice: raises 1000 to 1200
+Grace: raises 17900 to 19100 and is all-in
+Judy: folds 
+Mallory: folds 
+Niaj: folds 
+Alice: calls 17900
+*** FLOP *** [8h Ts 3d]
+*** TURN *** [8h Ts 3d] [9h]
+*** RIVER *** [8h Ts 3d 9h] [Ah]
+*** SHOW DOWN ***
+Alice: shows [7d As] (a pair of Aces)
+Grace: shows [Qh Ad] (a pair of Aces - Queen kicker)
+Grace collected 36666 from pot
+*** SUMMARY ***
+Total pot 38800 | Rake 2134 
+Board [8h Ts 3d 9h Ah]
+Seat 3: Heidi
+Seat 1: Alice (small blind) showed [7d As] and lost with a pair of Aces
+Seat 2: Grace (big blind) showed [Qh Ad] and won (36666) with a pair of Aces
+Seat 4: Judy folded before Flop
+Seat 5: Mallory folded before Flop
+Seat 6: Niaj (button) folded before Flop
+
+
+
