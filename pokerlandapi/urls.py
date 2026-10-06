@@ -14,6 +14,7 @@ urlpatterns = [
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     path("api/users/", include("users.urls")),
     path("api/tracker/", include("tracker.urls")),
+    path("api/hands/", include("hands.urls")),
 ]
 
 # The schema and Swagger UI describe every endpoint, so keep them out of prod.
