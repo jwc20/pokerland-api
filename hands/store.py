@@ -19,8 +19,9 @@ COLUMNS = (
     "hero_cards",
     "hero_net",
     "final_street",
+    "phh",
 )
-REPLAY = ("max_seats", "button_seat", "ante", "total_pot", "rake", "boards", "players", "events")
+REPLAY = ("max_seats", "button_seat", "ante", "total_pot", "rake", "board", "players", "events")
 
 
 def store_hands(stream, hands):

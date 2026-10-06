@@ -7,7 +7,8 @@ class Hand(models.Model):
 
     Amounts are integers: chips, or cents when `currency` is set. The columns
     are what the game history lists; `replay` holds the seats, events and
-    boards the replay steps through (see tracker.parsing.pokerstars).
+    boards the replay steps through, and `phh` the hand in the PHH notation, as
+    PokerKit read it (see tracker.parsing.pokerstars).
     """
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="hands")
@@ -29,6 +30,7 @@ class Hand(models.Model):
     hero_net = models.BigIntegerField(default=0)
     final_street = models.CharField(max_length=32)
     replay = models.JSONField(default=dict)
+    phh = models.TextField(blank=True)
 
     class Meta:
         constraints = [

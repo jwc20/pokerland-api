@@ -2,6 +2,7 @@ import uuid
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from pokerkit import HandHistory
 from rest_framework.test import APIClient, APITestCase
 
 from hands.models import Hand
@@ -72,14 +73,14 @@ class HandTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            {key: response.data[key] for key in ("max_seats", "button_seat", "ante", "total_pot", "rake", "boards")},
+            {key: response.data[key] for key in ("max_seats", "button_seat", "ante", "total_pot", "rake", "board")},
             {
                 "max_seats": 6,
                 "button_seat": 2,
                 "ante": 0,
                 "total_pot": 11344,
                 "rake": 624,
-                "boards": [["Ad", "2h", "3h", "Jc", "5c"]],
+                "board": ["Ad", "2h", "3h", "Jc", "5c"],
             },
         )
         self.assertEqual(
@@ -87,8 +88,16 @@ class HandTests(APITestCase):
         )
         self.assertEqual(
             response.data["events"][0],
-            {"type": "post", "street": "preflop", "player": "Dave", "blind": "small blind", "amount": 100},
+            {
+                "type": "post",
+                "street": "preflop",
+                "player": "Ivan",
+                "blind": "dead small blind",
+                "amount": 100,
+                "dead": 100,
+            },
         )
+        self.assertEqual(HandHistory.loads(response.data["phh"]).hand, 262289811345)
 
     def test_responses_match_the_schema(self):
         listed = self.client.get("/api/hands/").data

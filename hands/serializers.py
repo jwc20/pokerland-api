@@ -10,15 +10,11 @@ EVENT_TYPES = [
     "call",
     "bet",
     "raise",
-    "bring_in",
     "street",
     "return",
     "collect",
     "show",
     "muck",
-    "no_show",
-    "discard",
-    "stand_pat",
 ]
 
 
@@ -54,8 +50,7 @@ class HandPlayerSerializer(serializers.Serializer):
     seat = serializers.IntegerField()
     name = serializers.CharField()
     stack = serializers.IntegerField(help_text="Chips at the start of the hand.")
-    position = serializers.CharField(help_text="BTN, SB, BB, UTG, ...; empty when not dealt in or without a button.")
-    sitting_out = serializers.BooleanField(help_text="Not dealt into this hand.")
+    position = serializers.CharField(help_text="BTN, SB, BB, UTG, ...")
     cards = serializers.ListField(child=serializers.CharField(), help_text="Hole cards, when the history shows them.")
     won = serializers.IntegerField(help_text="Chips collected from the pot.")
     net = serializers.IntegerField(help_text="Chips won minus chips put in.")
@@ -69,42 +64,41 @@ class HandEventSerializer(serializers.Serializer):
     player = serializers.CharField(required=False)
     amount = serializers.IntegerField(
         required=False,
-        help_text="Chips the player puts in (post, call, bet, raise, bring_in) or gets back (return, collect).",
+        help_text="Chips the player puts in (post, call, bet, raise) or gets back (return, collect).",
     )
     dead = serializers.IntegerField(required=False, help_text="post: the part that is not a bet, e.g. an ante.")
     to = serializers.IntegerField(required=False, help_text="raise: the player's bet on this street afterwards.")
     by = serializers.IntegerField(required=False, help_text="raise: how much higher than the bet before.")
     all_in = serializers.BooleanField(required=False)
-    blind = serializers.CharField(required=False, help_text="post: small blind, big blind, ante, ...")
+    blind = serializers.CharField(required=False, help_text="post: small blind, big blind, ante, dead small blind, ...")
     cards = serializers.ListField(
         child=serializers.CharField(),
         required=False,
         help_text="deal, show, muck: the player's cards. street: the new board cards.",
     )
-    board = serializers.ListField(
-        child=serializers.CharField(), required=False, help_text="street: the whole board of this run."
+    board = serializers.ListField(child=serializers.CharField(), required=False, help_text="street: the whole board.")
+    pot = serializers.CharField(
+        required=False, help_text="collect: pot, or main pot, side pot-1, ... when there are several."
     )
-    run = serializers.IntegerField(required=False, help_text="street: 2 for the second board of a run-it-twice hand.")
-    pot = serializers.CharField(required=False, help_text="collect: pot, main pot, side pot, side pot-1, ...")
-    description = serializers.CharField(required=False, help_text="show: the hand, e.g. a pair of Kings.")
-    count = serializers.IntegerField(required=False, help_text="discard: how many cards.")
+    description = serializers.CharField(
+        required=False, help_text="show: the hand as PokerKit ranks it, e.g. Three of a kind."
+    )
 
 
 class HandDetailSerializer(HandSummarySerializer):
     """A hand with everything its replay needs."""
 
     max_seats = serializers.IntegerField(source="replay.max_seats", allow_null=True)
-    button_seat = serializers.IntegerField(source="replay.button_seat", allow_null=True)
+    button_seat = serializers.IntegerField(source="replay.button_seat")
     ante = serializers.IntegerField(source="replay.ante")
-    total_pot = serializers.IntegerField(source="replay.total_pot", allow_null=True)
-    rake = serializers.IntegerField(source="replay.rake", allow_null=True)
-    boards = serializers.ListField(
-        child=serializers.ListField(child=serializers.CharField()),
-        source="replay.boards",
-        help_text="The board, or one per run when the hand was run twice.",
-    )
-    players = HandPlayerSerializer(many=True, source="replay.players", help_text="Every seat, in seat order.")
+    total_pot = serializers.IntegerField(source="replay.total_pot")
+    rake = serializers.IntegerField(source="replay.rake")
+    board = serializers.ListField(child=serializers.CharField(), source="replay.board")
+    players = HandPlayerSerializer(many=True, source="replay.players", help_text="The players dealt in, in seat order.")
     events = HandEventSerializer(many=True, source="replay.events")
+    phh = serializers.CharField(
+        help_text="The hand in the PHH notation (https://phh.readthedocs.io), as PokerKit read it."
+    )
 
     class Meta(HandSummarySerializer.Meta):
         fields = (
@@ -114,8 +108,9 @@ class HandDetailSerializer(HandSummarySerializer):
             "ante",
             "total_pot",
             "rake",
-            "boards",
+            "board",
             "players",
             "events",
+            "phh",
         )
         read_only_fields = fields
