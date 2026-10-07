@@ -1,4 +1,5 @@
 import datetime
+import statistics
 import uuid
 from unittest import mock
 
@@ -329,6 +330,16 @@ class HandTagTests(APITestCase):
 
         self.assertEqual((button["hands"], button["won"], button["lost"]), (4, 1, 3))
         self.assertAlmostEqual(button["net_bb"], -10 / 20 - 2659 / 200 - 10000 / 200 + 2130 / 50, delta=0.01)
+
+    def test_a_tag_has_the_spread_of_its_results_in_big_blinds(self):
+        tags = self.tags()
+
+        self.assertAlmostEqual(
+            tags["position:BTN"]["bb_stdev"],
+            statistics.stdev([-10 / 20, -2659 / 200, -10000 / 200, 2130 / 50]),
+            delta=0.01,
+        )
+        self.assertIsNone(tags["game:Omaha Pot Limit"]["bb_stdev"])  # one hand has no spread
 
     def test_all_comes_first_then_the_most_played_tags(self):
         tags = self.client.get("/api/hands/tags/").data

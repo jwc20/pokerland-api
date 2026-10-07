@@ -185,3 +185,10 @@ class HandTagSerializer(serializers.Serializer):
     won = serializers.IntegerField(help_text="Hands with a positive result.")
     lost = serializers.IntegerField(help_text="Hands with a negative result.")
     net_bb = serializers.FloatField(help_text="Their results summed in big blinds.")
+    bb_stdev = serializers.FloatField(
+        allow_null=True,
+        help_text=(
+            "How much a hand's result varies: the sample standard deviation of their results in big blinds, "
+            "from which bb/100's standard error is 100 × bb_stdev ÷ √hands. Null for fewer than two hands."
+        ),
+    )

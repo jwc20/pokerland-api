@@ -1,6 +1,7 @@
 """What the web app's home page shows about a user's hands: results per day and per tag."""
 
 import datetime
+import math
 
 from django.db.models import Count, FloatField, Q, Sum
 from django.db.models.functions import Cast, TruncDate
@@ -8,16 +9,22 @@ from django.db.models.functions import Cast, TruncDate
 from hands.filters import FORMAT, stakes_value, tag_key
 
 
+def hand_bb():
+    """A hand's result in big blinds."""
+    return Cast("hero_net", FloatField()) / Cast("big_blind", FloatField())
+
+
 def net_bb():
     """The hands' results summed in big blinds, which add up across stakes and currencies where chips and cents don't.
 
     A hand without a big blind adds nothing rather than dividing by zero.
     """
-    return Sum(
-        Cast("hero_net", FloatField()) / Cast("big_blind", FloatField()),
-        filter=Q(big_blind__gt=0),
-        default=0.0,
-    )
+    return Sum(hand_bb(), filter=Q(big_blind__gt=0), default=0.0)
+
+
+def net_bb_squares():
+    """The squares of the hands' results in big blinds, summed: with `net_bb`, what their spread comes from."""
+    return Sum(hand_bb() * hand_bb(), filter=Q(big_blind__gt=0), default=0.0)
 
 
 def results():
@@ -27,7 +34,19 @@ def results():
         "won": Count("id", filter=Q(hero_net__gt=0)),
         "lost": Count("id", filter=Q(hero_net__lt=0)),
         "net_bb": net_bb(),
+        "net_bb_squares": net_bb_squares(),
     }
+
+
+def sample_stdev(count, total, squares):
+    """The sample standard deviation of `count` values, from their sum and the sum of their squares.
+
+    As PokerKit's `Statistics.payoff_stdev` computes it, dividing by count - 1;
+    None for fewer than two values.
+    """
+    if count < 2:
+        return None
+    return math.sqrt(max(0.0, (squares - total * total / count) / (count - 1)))  # rounding can dip below zero
 
 
 def played_days(hands, tz):
@@ -77,6 +96,7 @@ def tag_stats(hands):
 
 
 def _tag(group, value, counts, stakes=None):
+    stdev = sample_stdev(counts["hands"], counts["net_bb"], counts["net_bb_squares"])
     return {
         "key": tag_key(group, value),
         "group": group,
@@ -86,4 +106,5 @@ def _tag(group, value, counts, stakes=None):
         "won": counts["won"],
         "lost": counts["lost"],
         "net_bb": round(counts["net_bb"], 2),
+        "bb_stdev": None if stdev is None else round(stdev, 2),
     }
