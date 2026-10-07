@@ -1,0 +1,31 @@
+# PostgreSQL for local development, the database dev and prod run on. The API
+# itself runs on the host (`uv run python manage.py runserver`); see the README.
+#
+#   docker compose up -d       start it in the background
+#   docker compose down        stop it; the data stays in the postgres-data volume
+#   docker compose down -v     stop it and delete the data
+#
+# The database, user, password and port come from DB_NAME, DB_USER, DB_PASSWORD
+# and DB_PORT in .env, which Compose reads too, so Django and the container agree.
+# Empty, they default to pokerland / pokerland / pokerland / 5432.
+
+services:
+  db:
+    image: postgres:17-alpine # keep the major version in step with the dev and prod databases
+    environment:
+      POSTGRES_DB: ${DB_NAME:-pokerland}
+      POSTGRES_USER: ${DB_USER:-pokerland}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pokerland}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432" # this machine only
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

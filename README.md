@@ -45,7 +45,8 @@ pokerland-api is the Django REST API between the trackers and the web app. It:
 
 ## Quick start
 
-You need Python 3.14+ and [uv](https://docs.astral.sh/uv/). The API uses SQLite locally and PostgreSQL in dev and prod.
+You need Python 3.14+ and [uv](https://docs.astral.sh/uv/). The API uses SQLite locally unless you run PostgreSQL, as
+dev and prod do, in Docker ([below](#local-postgresql)).
 
 ```bash
 git clone https://github.com/jwc20/pokerland-api.git
@@ -133,6 +134,22 @@ The tests use Django's runner and DRF's test client, with SQLite unless `DB_NAME
 fixtures, and `pokerlandapi.tests.SchemaTests` runs `spectacular --validate --fail-on-warn`, so a schema warning fails
 the suite. After changing an endpoint, regenerate pokerland-client's API client: run `npm run generate:api` there
 while this server is running.
+
+### Local PostgreSQL
+
+SQLite is enough to get going, but dev and prod run PostgreSQL, and some queries behave differently on it. To develop
+and test against PostgreSQL, start it in Docker with [`compose.yaml`](compose.yaml); the API still runs on your machine.
+
+```bash
+docker compose up -d --wait      # PostgreSQL on 127.0.0.1:5432, data kept in a Docker volume
+```
+
+Then set the database in `.env` as `.env.example` describes (`DB_NAME`, `DB_USER` and `DB_PASSWORD` to `pokerland`,
+`DB_HOST` to `127.0.0.1`), and run `uv run python manage.py migrate`. The container takes its database, user, password
+and port from the same variables. PostgreSQL only reads the first three when it creates its data, so after changing
+them, recreate it with `docker compose down -v`. The tests create a `test_pokerland`
+database next to it and drop it afterwards. `docker compose down` stops PostgreSQL and keeps the data;
+`docker compose down -v` deletes it too.
 
 ```
 pokerlandapi/   settings, root URLs, cookie JWT auth, registration, schema extensions
