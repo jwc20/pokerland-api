@@ -119,7 +119,10 @@ SPECTACULAR_SETTINGS = {
     # Tag each operation with the path segment after /api/ (auth, ...). The
     # client groups its generated API classes by that tag.
     "SCHEMA_PATH_PREFIX": r"/api",
-    "ENUM_NAME_OVERRIDES": {"HandEventTypeEnum": "hands.serializers.EVENT_TYPES"},
+    "ENUM_NAME_OVERRIDES": {
+        "HandEventTypeEnum": "hands.serializers.EVENT_TYPES",
+        "HandTagGroupEnum": "hands.filters.TAG_GROUPS",
+    },
 }
 
 
