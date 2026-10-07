@@ -14,8 +14,10 @@ from hands.serializers import (
     HandListQuerySerializer,
     HandSummarySerializer,
     HandTagSerializer,
+    StatGroupSerializer,
+    StatsQuerySerializer,
 )
-from hands.stats import played_days, streaks, tag_stats
+from hands.stats import hero_stats, played_days, streaks, tag_stats
 
 
 class HandPagination(CursorPagination):
@@ -85,3 +87,22 @@ class HandTagsView(APIView):
     def get(self, request):
         tags = tag_stats(Hand.objects.filter(PLAYED, user=request.user))
         return Response(HandTagSerializer(tags, many=True).data)
+
+
+class StatsView(APIView):
+    """The signed-in user's statistics as the hero, over all their hands or a tag's or a stretch of days'."""
+
+    @extend_schema(parameters=[StatsQuerySerializer], responses=StatGroupSerializer(many=True))
+    def get(self, request):
+        query = StatsQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        tz = filters.get("tz", UTC)
+        hands = Hand.objects.filter(PLAYED, user=request.user)
+        if "tag" in filters:
+            hands = hands.filter(tag_filter(filters["tag"]))
+        if "since" in filters:
+            hands = hands.filter(played_at__gte=day_bounds(filters["since"], tz)[0])
+        if "until" in filters:
+            hands = hands.filter(played_at__lt=day_bounds(filters["until"], tz)[1])
+        return Response(StatGroupSerializer(hero_stats(hands, filters["group_by"], tz), many=True).data)

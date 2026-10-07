@@ -1,6 +1,8 @@
 """Writes the hands tracker.parsing reads from a stream."""
 
-from hands.models import Hand
+from django.db import transaction
+
+from hands.models import Hand, HandPlayer
 
 # Hand fields that come straight from the parser; the rest of a parsed hand goes in `replay`.
 COLUMNS = (
@@ -22,23 +24,48 @@ COLUMNS = (
     "phh",
 )
 REPLAY = ("max_seats", "button_seat", "ante", "total_pot", "rake", "board", "players", "events")
+# Hand fields from tracker.parsing.facts.
+FACT_COLUMNS = (
+    "hero_combo",
+    "players_dealt",
+    "pot_type",
+    "hero_situation",
+    "hero_first_action",
+    "effective_bb",
+    "hero_m",
+    "facts",
+)
 
 
 def store_hands(stream, hands):
-    """Saves hands parsed from `stream`, updating any already saved, e.g. by an earlier parse."""
+    """Saves hands parsed from `stream`, updating any already saved, e.g. by an earlier parse.
+
+    Each hand's HandPlayer rows are replaced, in the same transaction.
+    """
     by_id = {(hand["site"], hand["hand_id"]): hand for hand in hands}  # one row per hand, as the upsert requires
     rows = [
         Hand(
             user_id=stream.user_id,
             stream=stream,
             **{name: hand[name] for name in COLUMNS},
+            **hand["facts"]["hand"],
             replay={name: hand[name] for name in REPLAY},
         )
         for hand in by_id.values()
     ]
-    Hand.objects.bulk_create(
-        rows,
-        update_conflicts=True,
-        unique_fields=("user", "site", "hand_id"),
-        update_fields=("stream", *COLUMNS[2:], "replay"),
-    )
+    with transaction.atomic():
+        Hand.objects.bulk_create(
+            rows,
+            update_conflicts=True,
+            unique_fields=("user", "site", "hand_id"),
+            update_fields=("stream", *COLUMNS[2:], *FACT_COLUMNS, "replay"),
+        )
+        # The upsert doesn't report ids on every database, so they are looked up.
+        saved = Hand.objects.filter(user_id=stream.user_id, hand_id__in=[hand_id for _, hand_id in by_id])
+        ids = {(site, hand_id): pk for site, hand_id, pk in saved.values_list("site", "hand_id", "id")}
+        HandPlayer.objects.filter(hand_id__in=[ids[key] for key in by_id]).delete()
+        HandPlayer.objects.bulk_create(
+            HandPlayer(hand_id=ids[key], user_id=stream.user_id, is_hero=row["name"] == hand["hero"], **row)
+            for key, hand in by_id.items()
+            for row in hand["facts"]["players"]
+        )

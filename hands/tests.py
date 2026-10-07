@@ -8,13 +8,14 @@ from django.test import SimpleTestCase
 from pokerkit import HandHistory
 from rest_framework.test import APIClient, APITestCase
 
-from hands.models import Hand
-from hands.stats import streaks
+from hands.models import Hand, HandPlayer
+from hands.stats import proportion, streaks
 from hands.store import store_hands
 from hands.views import HandPagination
 from pokerlandapi.tests import openapi_schema
 from tracker import parsing
 from tracker.models import LogStream
+from tracker.parsing.facts import STATS
 from tracker.tests_parsing import fixture
 
 User = get_user_model()
@@ -361,3 +362,119 @@ class HandTagTests(APITestCase):
         self.assertEqual(self.tags()["all"]["hands"], 13)
         self.assertEqual(len(self.client.get("/api/hands/", {"tag": "all"}).data["results"]), 13)
         self.assertEqual(len(self.client.get("/api/hands/").data["results"]), 14)
+
+
+class HandPlayerTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        self.stream = add_stream(self.user, "steals_and_squeezes.txt")
+
+    def test_each_player_in_a_hand_has_a_row(self):
+        hand = Hand.objects.get(hand_id="262300000002")
+
+        hero = hand.seats.get(is_hero=True)
+
+        self.assertEqual(hand.seats.count(), 6)
+        self.assertEqual((hero.name, hero.position, hero.squeeze_could, hero.squeeze_did), ("Alice", "BTN", 1, 1))
+        self.assertEqual((hand.hero_combo, hand.pot_type, hand.hero_situation), ("KK", "3bet", "raised"))
+        self.assertEqual(hand.facts["hero"]["made"], {"flop": "set"})
+
+    def test_storing_hands_again_replaces_their_rows(self):
+        first = set(HandPlayer.objects.values_list("id", flat=True))
+        _, hands = parsing.parse(fixture("steals_and_squeezes.txt"), {})
+
+        store_hands(self.stream, hands)
+
+        self.assertEqual(HandPlayer.objects.filter(user=self.user).count(), 12)
+        self.assertFalse(first & set(HandPlayer.objects.values_list("id", flat=True)))
+
+    def test_every_statistic_has_its_columns(self):
+        columns = {field.name for field in HandPlayer._meta.get_fields()}
+
+        for stat in STATS:
+            with self.subTest(stat=stat):
+                self.assertLessEqual({f"{stat}_could", f"{stat}_did"}, columns)
+
+
+class ProportionTests(SimpleTestCase):
+    def test_a_share_with_its_wilson_interval(self):
+        self.assertEqual(proportion(5, 10), {"did": 5, "could": 10, "pct": 50.0, "ci_low": 23.7, "ci_high": 76.3})
+        self.assertEqual((proportion(0, 10)["ci_low"], proportion(0, 10)["ci_high"]), (0.0, 27.8))
+        self.assertEqual((proportion(10, 10)["ci_low"], proportion(10, 10)["ci_high"]), (72.2, 100.0))
+
+    def test_no_chances_have_no_share(self):
+        self.assertEqual(proportion(0, 0), {"did": 0, "could": 0, "pct": None, "ci_low": None, "ci_high": None})
+
+
+class StatsTests(APITestCase):
+    FIXTURES = (*HandTagTests.FIXTURES, "steals_and_squeezes.txt")
+
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        for name in self.FIXTURES:
+            add_stream(self.user, name)
+        self.client.force_authenticate(self.user)
+
+    def stats(self, **params):
+        response = self.client.get("/api/stats/", params)
+        self.assertEqual(response.status_code, 200, response.data)
+        return response.data
+
+    def test_all_the_heros_hands(self):
+        [group] = self.stats()
+
+        counts = {stat: (group["stats"][stat]["did"], group["stats"][stat]["could"]) for stat in ("vpip", "pfr", "rfi")}
+
+        self.assertEqual((group["key"], group["hands"]), ("all", 16))
+        self.assertEqual(counts, {"vpip": (12, 16), "pfr": (7, 16), "rfi": (2, 7)})
+        self.assertEqual(group["stats"]["vpip"], proportion(12, 16))
+        self.assertEqual((group["stats"]["aggression"]["did"], group["stats"]["aggression"]["could"]), (10, 18))
+
+    def test_by_position_in_the_order_they_act(self):
+        groups = self.stats(group_by="position")
+
+        self.assertEqual(
+            [(group["key"], group["hands"], group["net_bb"]) for group in groups],
+            [("UTG", 3, -28.5), ("CO", 1, -1.0), ("BTN", 5, -50.2), ("SB", 3, -79.3), ("BB", 4, 56.89)],
+        )
+        self.assertEqual(groups[2]["stats"]["rfi"]["did"], 2)
+
+    def test_by_month(self):
+        groups = self.stats(group_by="month", tz="UTC")
+
+        self.assertEqual([(group["key"], group["hands"]) for group in groups], [("2020-09", 4), ("2026-10", 12)])
+
+    def test_a_tags_hands_or_a_stretch_of_days(self):
+        self.assertEqual(self.stats(tag="format:tournament")[0]["hands"], 1)
+        self.assertEqual(self.stats(since="2026-10-01")[0]["hands"], 12)
+        self.assertEqual(self.stats(until="2020-09-30", tz="America/New_York")[0]["hands"], 4)
+
+    def test_the_spread_of_the_results(self):
+        [group] = self.stats(tag="position:BTN")
+
+        results = Hand.objects.filter(hero_position="BTN").values_list("hero_net", "big_blind")
+
+        self.assertAlmostEqual(group["bb_stdev"], statistics.stdev(net / bb for net, bb in results), delta=0.01)
+
+    def test_bad_filters_are_rejected(self):
+        for params in ({"group_by": "table"}, {"tag": "nope"}, {"since": "2026-10-02", "until": "2026-10-01"}):
+            with self.subTest(params=params):
+                self.assertEqual(self.client.get("/api/stats/", params).status_code, 400)
+
+    def test_another_users_hands_are_not_counted(self):
+        client = APIClient()
+        client.force_authenticate(User.objects.create_user("bob"))
+
+        [group] = client.get("/api/stats/").data
+
+        self.assertEqual((group["hands"], group["stats"]["vpip"]["could"], group["bb_stdev"]), (0, 0, None))
+
+    def test_stats_need_a_signed_in_user(self):
+        self.assertEqual(APIClient().get("/api/stats/").status_code, 401)
+
+    def test_responses_match_the_schema(self):
+        [group] = self.stats()
+
+        self.assertEqual(set(group), schema_properties("StatGroup"))
+        self.assertEqual(set(group["stats"]), schema_properties("StatSet"))
+        self.assertEqual(set(group["stats"]["vpip"]), schema_properties("Stat"))

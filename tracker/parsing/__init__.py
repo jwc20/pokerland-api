@@ -6,8 +6,10 @@ state between calls, so a hand split across two chunks is seen whole:
 1. the framer below splits the text into complete hands, carrying the last,
    still incomplete one over in `state["partial"]`;
 2. `pokerstars.extract` reads a hand with PokerKit into the PHH notation and
-   replays it into data: seats, events, results;
-3. `hands.store.store_hands` writes the hands to the database.
+   replays it into data: seats, events, results, and the facts behind the
+   statistics (`facts.hand_facts`);
+3. `hands.store.store_hands` writes the hands and their players' facts to the
+   database.
 
 PARSER_VERSION is stored on each stream, so a new parser can find streams that
 need re-parsing (`manage.py tracker_drain --reparse`).
@@ -18,7 +20,7 @@ import re
 
 from tracker.parsing import pokerstars
 
-PARSER_VERSION = 3
+PARSER_VERSION = 4
 
 HAND_START = re.compile(r"^PokerStars (?:Zoom |Home Game )?(?:Hand|Game) #", re.MULTILINE)
 SUMMARY = "*** SUMMARY ***"

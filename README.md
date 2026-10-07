@@ -77,6 +77,7 @@ point a tracker at your local API, run `pokerland-tracker login --api http://loc
 | `GET /api/hands/<id>/`                                                | cookies        | One hand: its seats, events and board, and the hand in PHH notation                                                                                 |
 | `GET /api/hands/days/?tz=<IANA zone>`                                 | cookies        | Each day's hands and result in big blinds in that time zone, with the current and best streak                                                       |
 | `GET /api/hands/tags/`                                                | cookies        | Hands counted by position, game, cash-game stakes and format, with won, lost and net big blinds                                                     |
+| `GET /api/stats/`                                                     | cookies        | The hero's statistics (VPIP, PFR, 3-bet, c-bet, ...) as did ÷ could with 95% Wilson intervals, for all hands or by `?group_by=position` or `month`; narrow with `?tag=`, `?since=` and `?until=` |
 | `GET /api/tracker/status/`                                            | cookies        | What the user's trackers have uploaded: the last upload, files, hands, platforms and versions                                                       |
 | `GET /api/tracker/me/`, `GET /api/tracker/config/`                    | client token   | The token's user, and the settings a tracker fetches at startup and every few hours                                                                 |
 | `PUT /api/tracker/streams/<id>/`                                      | client token   | Registers a hand-history file, or tells a tracker how much of it the server has                                                                     |
@@ -155,7 +156,7 @@ database next to it and drop it afterwards. `docker compose down` stops PostgreS
 pokerlandapi/   settings, root URLs, cookie JWT auth, registration, schema extensions
 users/          the client tokens trackers sign in with
 tracker/        uploads (streams, chunks, raw storage, async parsing) and the parser in tracker/parsing/
-hands/          parsed hands, and the filters and stats behind the web app's home page
+hands/          parsed hands and each player's facts, and the filters and stats behind the web app
 scripts/        deploy.py
 ```
 

@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from hands.views import StatsView
 from pokerlandapi import schema  # noqa: F401  registers the OpenAPI extensions
 from pokerlandapi.views import RegisterView
 
@@ -15,6 +16,7 @@ urlpatterns = [
     path("api/users/", include("users.urls")),
     path("api/tracker/", include("tracker.urls")),
     path("api/hands/", include("hands.urls")),
+    path("api/stats/", StatsView.as_view(), name="stats"),
 ]
 
 # The schema and Swagger UI describe every endpoint, so keep them out of prod.

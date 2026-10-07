@@ -1,0 +1,71 @@
+PokerStars Hand #262300000001:  Hold'em No Limit (100/200) - 2026/10/05 2:00:00 UTC [2026/10/04 22:00:00 ET]
+Table 'Fixture I' 6-max (Play Money) Seat #3 is the button
+Seat 1: Bob (20000 in chips)
+Seat 2: Carol (20000 in chips)
+Seat 3: Dave (20000 in chips)
+Seat 4: Erin (20000 in chips)
+Seat 5: Alice (20000 in chips)
+Seat 6: Frank (20000 in chips)
+Erin: posts small blind 100
+Alice: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Ah Qd]
+Frank: folds
+Bob: folds
+Carol: raises 400 to 600
+Dave: folds
+Erin: folds
+Alice: raises 1400 to 2000
+Carol: folds
+Uncalled bet (1400) returned to Alice
+Alice collected 1300 from pot
+*** SUMMARY ***
+Total pot 1300 | Rake 0
+Seat 1: Bob folded before Flop (didn't bet)
+Seat 2: Carol folded before Flop
+Seat 3: Dave (button) folded before Flop (didn't bet)
+Seat 4: Erin (small blind) folded before Flop
+Seat 5: Alice (big blind) collected (1300)
+Seat 6: Frank folded before Flop (didn't bet)
+
+
+
+PokerStars Hand #262300000002:  Hold'em No Limit (100/200) - 2026/10/05 2:01:00 UTC [2026/10/04 22:01:00 ET]
+Table 'Fixture I' 6-max (Play Money) Seat #4 is the button
+Seat 1: Bob (20000 in chips)
+Seat 2: Carol (20000 in chips)
+Seat 3: Dave (20000 in chips)
+Seat 4: Alice (20000 in chips)
+Seat 5: Erin (20000 in chips)
+Seat 6: Frank (20000 in chips)
+Erin: posts small blind 100
+Frank: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Kc Kd]
+Bob: raises 400 to 600
+Carol: calls 600
+Dave: folds
+Alice: raises 2200 to 2800
+Erin: folds
+Frank: folds
+Bob: calls 2200
+Carol: folds
+*** FLOP *** [7c 2d Kh]
+Bob: checks
+Alice: bets 3000
+Bob: raises 6000 to 9000
+Alice: folds
+Uncalled bet (6000) returned to Bob
+Bob collected 12500 from pot
+*** SUMMARY ***
+Total pot 12500 | Rake 0
+Board [7c 2d Kh]
+Seat 1: Bob collected (12500)
+Seat 2: Carol folded before Flop
+Seat 3: Dave folded before Flop (didn't bet)
+Seat 4: Alice (button) folded on the Flop
+Seat 5: Erin (small blind) folded before Flop
+Seat 6: Frank (big blind) folded before Flop (didn't bet)
+
+
+

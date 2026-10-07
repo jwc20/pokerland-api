@@ -4,7 +4,8 @@ PokerKit's `PokerStarsParser` turns a hand into a hand history in the PHH
 notation (https://pokerkit.readthedocs.io/en/stable/notation.html), and
 iterating a hand history plays it through PokerKit's rules engine. `extract`
 does both and turns PokerKit's operations into what the game history and the
-replay show. It returns plain data, so it runs on fixture files offline.
+replay show, and the facts the statistics count (tracker.parsing.facts). It
+returns plain data, so it runs on fixture files offline.
 
 PokerKit's parser reads no-limit hold'em cash games without antes. The subclass
 below extends it to what PokerStars histories hold: antes, a returning player's
@@ -34,6 +35,8 @@ from pokerkit import (
     HoleDealing,
     notation,
 )
+
+from tracker.parsing.facts import hand_facts
 
 SITE = "pokerstars"
 GAMES = {"Hold'em No Limit": "NT", "Omaha Pot Limit": "PO"}  # PokerStars' names, PokerKit's variant codes
@@ -234,7 +237,7 @@ def extract(text):
     players = replay.players()
     hero = next((player for player in players if player["name"] == replay.hero), None)
     antes = [event["amount"] for event in replay.events if event.get("blind") == "ante"]
-    return {
+    hand = {
         "site": SITE,
         "hand_id": str(hh.hand),
         "played_at": datetime(hh.year, hh.month, hh.day, hh.time.hour, hh.time.minute, hh.time.second, tzinfo=UTC),
@@ -260,6 +263,8 @@ def extract(text):
         "events": replay.events,
         "phh": hh.dumps(),
     }
+    hand["facts"] = hand_facts(hand)
+    return hand
 
 
 class _Replay:

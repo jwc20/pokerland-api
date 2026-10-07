@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 from hands.filters import TAG_GROUPS, tag_filter, zone
 from hands.models import Hand
+from hands.stats import STAT_GROUPINGS
+from tracker.parsing.facts import STATS
 
 EVENT_TYPES = [
     "post",
@@ -127,21 +129,26 @@ class TimeZoneField(serializers.CharField):
             raise serializers.ValidationError("Not a time zone.") from None
 
 
-class HandListQuerySerializer(serializers.Serializer):
-    """What the game history can be narrowed down to. Either one leaves out the hands the user sat out."""
+class TagField(serializers.CharField):
+    """A tag's `key` in /api/hands/tags/, e.g. "position:BTN"."""
 
-    tag = serializers.CharField(required=False, help_text="Only the hands a tag counts: its `key` in /api/hands/tags/.")
-    date = serializers.DateField(required=False, help_text="Only the hands played on this day in `tz`.")
-    tz = TimeZoneField(
-        required=False, help_text='The IANA time zone `date` is a day in, e.g. "Europe/London"; UTC if left out.'
-    )
-
-    def validate_tag(self, key):
+    def to_internal_value(self, data):
+        key = super().to_internal_value(data)
         try:
             tag_filter(key)
         except ValueError:
             raise serializers.ValidationError("Not a tag.") from None
         return key
+
+
+class HandListQuerySerializer(serializers.Serializer):
+    """What the game history can be narrowed down to. Either one leaves out the hands the user sat out."""
+
+    tag = TagField(required=False, help_text="Only the hands a tag counts: its `key` in /api/hands/tags/.")
+    date = serializers.DateField(required=False, help_text="Only the hands played on this day in `tz`.")
+    tz = TimeZoneField(
+        required=False, help_text='The IANA time zone `date` is a day in, e.g. "Europe/London"; UTC if left out.'
+    )
 
 
 class HandDaysQuerySerializer(serializers.Serializer):
@@ -192,3 +199,68 @@ class HandTagSerializer(serializers.Serializer):
             "from which bb/100's standard error is 100 × bb_stdev ÷ √hands. Null for fewer than two hands."
         ),
     )
+
+
+class StatsQuerySerializer(serializers.Serializer):
+    """Which of the hero's hands /api/stats/ counts, and how it groups them. It leaves out hands they sat out."""
+
+    group_by = serializers.ChoiceField(
+        choices=STAT_GROUPINGS,
+        default="none",
+        help_text="One group of all the hands, or one per position, or one per month in `tz`.",
+    )
+    tag = TagField(required=False, help_text="Only the hands a tag counts: its `key` in /api/hands/tags/.")
+    since = serializers.DateField(required=False, help_text="Only the hands played from this day on, in `tz`.")
+    until = serializers.DateField(
+        required=False, help_text="Only the hands played up to the end of this day, in `tz`."
+    )
+    tz = TimeZoneField(
+        required=False,
+        help_text='The IANA time zone days and months are counted in, e.g. "Europe/London"; UTC if left out.',
+    )
+
+    def validate(self, attrs):
+        if "since" in attrs and "until" in attrs and attrs["since"] > attrs["until"]:
+            raise serializers.ValidationError({"since": "After `until`."})
+        return attrs
+
+
+class StatSerializer(serializers.Serializer):
+    """How often the hero did something out of how often they could have, with its 95% Wilson interval."""
+
+    did = serializers.IntegerField()
+    could = serializers.IntegerField()
+    pct = serializers.FloatField(allow_null=True, help_text="did ÷ could, in percent; null without a chance.")
+    ci_low = serializers.FloatField(allow_null=True, help_text="Where the 95% interval begins, in percent.")
+    ci_high = serializers.FloatField(allow_null=True, help_text="Where the 95% interval ends, in percent.")
+
+
+# A field per statistic, each described as tracker.parsing.facts.STATS describes it.
+StatSetSerializer = type(
+    "StatSetSerializer",
+    (serializers.Serializer,),
+    {
+        "__module__": __name__,
+        "__doc__": "Every statistic in tracker.parsing.facts.STATS, and the aggression frequency.",
+        **{stat: StatSerializer(help_text=text) for stat, text in STATS.items()},
+        "aggression": StatSerializer(
+            help_text="Bet or raised after the flop: (bets + raises) ÷ (bets + raises + calls + folds)."
+        ),
+    },
+)
+
+
+class StatGroupSerializer(serializers.Serializer):
+    """The hero's statistics over a group of their hands: all of them, a position's, or a month's."""
+
+    key = serializers.CharField(help_text='"all", a position such as "BTN", or a month such as "2026-10".')
+    hands = serializers.IntegerField()
+    net_bb = serializers.FloatField(help_text="Their results summed in big blinds.")
+    bb_stdev = serializers.FloatField(
+        allow_null=True,
+        help_text=(
+            "How much a hand's result varies: the sample standard deviation of their results in big blinds. "
+            "Null for fewer than two hands."
+        ),
+    )
+    stats = StatSetSerializer()
