@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from hands.filters import TAG_GROUPS, tag_filter, zone
+from hands.filters import HAND_RESULTS, HAND_SORTS, TAG_GROUPS, tag_filter, zone
 from hands.models import Hand
 from hands.stats import STAT_GROUPINGS
 from tracker.parsing.facts import STATS
@@ -141,14 +141,57 @@ class TagField(serializers.CharField):
         return key
 
 
-class HandListQuerySerializer(serializers.Serializer):
-    """What the game history can be narrowed down to. Either one leaves out the hands the user sat out."""
+class HandFilterSerializer(serializers.Serializer):
+    """Which of the user's hands to count. Any filter leaves out the hands they sat out."""
 
-    tag = TagField(required=False, help_text="Only the hands a tag counts: its `key` in /api/hands/tags/.")
-    date = serializers.DateField(required=False, help_text="Only the hands played on this day in `tz`.")
-    tz = TimeZoneField(
-        required=False, help_text='The IANA time zone `date` is a day in, e.g. "Europe/London"; UTC if left out.'
+    tag = serializers.ListField(
+        child=TagField(),
+        required=False,
+        help_text="Only the hands every one of these tags counts: their `key`s in /api/hands/tags/. Repeatable.",
     )
+    since = serializers.DateField(required=False, help_text="Only the hands played from this day on, in `tz`.")
+    until = serializers.DateField(
+        required=False, help_text="Only the hands played up to the end of this day, in `tz`."
+    )
+    tz = TimeZoneField(
+        required=False,
+        help_text='The IANA time zone days and months are counted in, e.g. "Europe/London"; UTC if left out.',
+    )
+
+    def validate(self, attrs):
+        if "since" in attrs and "until" in attrs and attrs["since"] > attrs["until"]:
+            raise serializers.ValidationError({"since": "After `until`."})
+        return attrs
+
+
+class HandListQuerySerializer(HandFilterSerializer):
+    """What the game history can be narrowed down to, and sorted by."""
+
+    date = serializers.DateField(required=False, help_text="Only the hands played on this day in `tz`.")
+    stat = serializers.ChoiceField(
+        choices=[*STATS, "aggression"],
+        required=False,
+        help_text="Only the hands that gave the hero a chance at this statistic, as /api/stats/ counts them.",
+    )
+    did = serializers.BooleanField(
+        required=False,
+        allow_null=True,  # else DRF reads a missing query parameter as false
+        help_text="With `stat`: only the hands where the hero took the chance (true) or let it go (false).",
+    )
+    result = serializers.ChoiceField(
+        choices=HAND_RESULTS, required=False, help_text="Only the hands the hero won, lost or broke even in."
+    )
+    sort = serializers.ChoiceField(
+        choices=HAND_SORTS,
+        default="newest",
+        help_text="Newest or oldest first, or by the hero's result in big blinds: the biggest wins or losses first.",
+    )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs.get("did") is not None and "stat" not in attrs:
+            raise serializers.ValidationError({"did": "Only with `stat`."})
+        return attrs
 
 
 class HandDaysQuerySerializer(serializers.Serializer):
@@ -201,7 +244,7 @@ class HandTagSerializer(serializers.Serializer):
     )
 
 
-class StatsQuerySerializer(serializers.Serializer):
+class StatsQuerySerializer(HandFilterSerializer):
     """Which of the hero's hands /api/stats/ counts, and how it groups them. It leaves out hands they sat out."""
 
     group_by = serializers.ChoiceField(
@@ -209,20 +252,6 @@ class StatsQuerySerializer(serializers.Serializer):
         default="none",
         help_text="One group of all the hands, or one per position, or one per month in `tz`.",
     )
-    tag = TagField(required=False, help_text="Only the hands a tag counts: its `key` in /api/hands/tags/.")
-    since = serializers.DateField(required=False, help_text="Only the hands played from this day on, in `tz`.")
-    until = serializers.DateField(
-        required=False, help_text="Only the hands played up to the end of this day, in `tz`."
-    )
-    tz = TimeZoneField(
-        required=False,
-        help_text='The IANA time zone days and months are counted in, e.g. "Europe/London"; UTC if left out.',
-    )
-
-    def validate(self, attrs):
-        if "since" in attrs and "until" in attrs and attrs["since"] > attrs["until"]:
-            raise serializers.ValidationError({"since": "After `until`."})
-        return attrs
 
 
 class StatSerializer(serializers.Serializer):

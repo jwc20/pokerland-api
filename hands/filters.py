@@ -1,4 +1,4 @@
-"""What the web app narrows a user's hands to: a tag, or a day in their time zone."""
+"""What the web app narrows a user's hands to: tags, days in their time zone, decisions and results."""
 
 import datetime
 import functools
@@ -22,6 +22,19 @@ FORMAT = Case(*(When(condition, then=Value(name)) for name, condition in FORMATS
 TAG_GROUPS = ["all", "position", "game", "stakes", "format"]
 
 UTC = zoneinfo.ZoneInfo("UTC")
+
+RESULTS = {"won": Q(hero_net__gt=0), "lost": Q(hero_net__lt=0), "even": Q(hero_net=0)}
+HAND_RESULTS = tuple(RESULTS)
+
+# The game history's orders. By result goes in big blinds (the `net_bb` annotation), so stakes compare;
+# the id breaks ties, so a cursor never skips or repeats a hand.
+SORT_ORDERS = {
+    "newest": ("-played_at", "-id"),
+    "oldest": ("played_at", "id"),
+    "biggest_win": ("-net_bb", "-id"),
+    "biggest_loss": ("net_bb", "id"),
+}
+HAND_SORTS = tuple(SORT_ORDERS)
 
 
 def tag_key(group, value):
@@ -73,3 +86,42 @@ def day_bounds(day, tz):
     start = datetime.datetime.combine(day, datetime.time.min, tzinfo=tz)
     end = datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time.min, tzinfo=tz)
     return start, end
+
+
+def stat_filter(stat, did=None):
+    """The hands that gave the hero a chance at `stat`, as a Q; with `did`, those where they took it, or not.
+
+    `stat` is one of tracker.parsing.facts.STATS, or "aggression": a move after
+    the flop, taken when it was a bet or a raise. Every condition is on the
+    hero's own HandPlayer row, so the Q must go into a single filter() call.
+    """
+    seat = {"seats__is_hero": True}
+    if stat == "aggression":
+        aggressive = Q(seats__postflop_bets__gt=0) | Q(seats__postflop_raises__gt=0)
+        chance = aggressive | Q(seats__postflop_calls__gt=0) | Q(seats__postflop_folds__gt=0)
+        took, passed = aggressive, Q(seats__postflop_bets=0, seats__postflop_raises=0)
+    else:
+        chance = Q(**{f"seats__{stat}_could__gt": 0})
+        took, passed = Q(**{f"seats__{stat}_did__gt": 0}), Q(**{f"seats__{stat}_did": 0})
+    if did is None:
+        return Q(**seat) & chance
+    return Q(**seat) & chance & (took if did else passed)
+
+
+def narrow(hands, filters):
+    """`hands` narrowed by the validated filters of hands.serializers.HandFilterSerializer and its subclasses."""
+    tz = filters.get("tz", UTC)
+    for key in filters.get("tag", []):
+        hands = hands.filter(tag_filter(key))
+    if "since" in filters:
+        hands = hands.filter(played_at__gte=day_bounds(filters["since"], tz)[0])
+    if "until" in filters:
+        hands = hands.filter(played_at__lt=day_bounds(filters["until"], tz)[1])
+    if "date" in filters:
+        start, end = day_bounds(filters["date"], tz)
+        hands = hands.filter(played_at__gte=start, played_at__lt=end)
+    if "stat" in filters:
+        hands = hands.filter(stat_filter(filters["stat"], filters.get("did")))
+    if "result" in filters:
+        hands = hands.filter(RESULTS[filters["result"]])
+    return hands

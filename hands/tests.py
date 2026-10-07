@@ -4,6 +4,7 @@ import uuid
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.test import SimpleTestCase
 from pokerkit import HandHistory
 from rest_framework.test import APIClient, APITestCase
@@ -478,3 +479,85 @@ class StatsTests(APITestCase):
         self.assertEqual(set(group), schema_properties("StatGroup"))
         self.assertEqual(set(group["stats"]), schema_properties("StatSet"))
         self.assertEqual(set(group["stats"]["vpip"]), schema_properties("Stat"))
+
+
+class HistoryFilterTests(APITestCase):
+    """The game history narrowed by tags, days, decisions and results, and sorted."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        for name in StatsTests.FIXTURES:
+            add_stream(self.user, name)
+        self.client.force_authenticate(self.user)
+
+    def hand_ids(self, **params):
+        """Every hand the history lists for `params`, following its cursor three hands at a time."""
+        ids, response = [], self.client.get("/api/hands/", {**params, "page_size": 3})
+        while True:
+            self.assertEqual(response.status_code, 200, response.data)
+            ids += [hand["hand_id"] for hand in response.data["results"]]
+            if not response.data["next"]:
+                return ids
+            response = self.client.get(response.data["next"])
+
+    def test_tags_combine(self):
+        expected = Hand.objects.filter(hero_position="BTN", play_money=True, tournament_id="")
+
+        ids = self.hand_ids(tag=["position:BTN", "format:play_money"])
+
+        self.assertEqual(sorted(ids), sorted(expected.values_list("hand_id", flat=True)))
+        self.assertTrue(0 < len(ids) < 5)  # fewer than the BTN tag alone
+
+    def test_the_chances_at_a_statistic_and_whether_they_were_taken(self):
+        self.assertEqual(len(self.hand_ids(stat="rfi")), 7)
+        self.assertEqual(len(self.hand_ids(stat="rfi", did="true")), 2)
+        self.assertEqual(len(self.hand_ids(stat="rfi", did="false")), 5)
+        self.assertEqual(self.hand_ids(stat="squeeze", did="true"), ["262300000002"])
+
+    def test_aggression_counts_moves_after_the_flop(self):
+        heroes = HandPlayer.objects.filter(is_hero=True)
+        moved = heroes.filter(
+            Q(postflop_bets__gt=0) | Q(postflop_raises__gt=0) | Q(postflop_calls__gt=0) | Q(postflop_folds__gt=0)
+        )
+        aggressive = heroes.filter(Q(postflop_bets__gt=0) | Q(postflop_raises__gt=0))
+
+        self.assertEqual(len(self.hand_ids(stat="aggression")), moved.count())
+        self.assertEqual(len(self.hand_ids(stat="aggression", did="true")), aggressive.count())
+
+    def test_results(self):
+        counts = {result: len(self.hand_ids(result=result)) for result in ("won", "lost", "even")}
+
+        self.assertEqual(counts["won"], Hand.objects.filter(hero_net__gt=0).count())
+        self.assertEqual(sum(counts.values()), 16)
+
+    def test_a_stretch_of_days(self):
+        self.assertEqual(len(self.hand_ids(since="2026-10-01")), 12)
+        self.assertEqual(len(self.hand_ids(since="2020-09-23", until="2020-09-23")), 2)
+
+    def test_sorted_by_result_in_big_blinds_across_pages(self):
+        for sort, descending in (("biggest_win", True), ("biggest_loss", False)):
+            with self.subTest(sort=sort):
+                ids = self.hand_ids(sort=sort)
+                hands = {hand.hand_id: hand.hero_net / hand.big_blind for hand in Hand.objects.all()}
+                results = [hands[hand_id] for hand_id in ids]
+                self.assertEqual(len(set(ids)), 16)  # each hand once
+                self.assertEqual(results, sorted(results, reverse=descending))
+
+    def test_oldest_first(self):
+        ids = self.hand_ids(sort="oldest")
+
+        self.assertEqual(ids[0], Hand.objects.order_by("played_at").first().hand_id)
+        self.assertEqual(len(ids), 16)
+
+    def test_bad_filters_are_rejected(self):
+        bad = ({"did": "true"}, {"sort": "random"}, {"stat": "nope"}, {"result": "maybe"}, {"tag": ["all", "nope"]})
+        for params in bad:
+            with self.subTest(params=params):
+                self.assertEqual(self.client.get("/api/hands/", params).status_code, 400)
+
+    def test_the_statistics_take_the_same_tags(self):
+        tags = ["position:BTN", "format:play_money"]
+
+        [group] = self.client.get("/api/stats/", {"tag": tags}).data
+
+        self.assertEqual(group["hands"], len(self.hand_ids(tag=tags)))

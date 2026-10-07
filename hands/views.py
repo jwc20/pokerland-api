@@ -5,7 +5,7 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from hands.filters import PLAYED, UTC, day_bounds, tag_filter
+from hands.filters import PLAYED, SORT_ORDERS, UTC, narrow
 from hands.models import Hand
 from hands.serializers import (
     HandCalendarSerializer,
@@ -17,38 +17,39 @@ from hands.serializers import (
     StatGroupSerializer,
     StatsQuerySerializer,
 )
-from hands.stats import hero_stats, played_days, streaks, tag_stats
+from hands.stats import hand_bb, hero_stats, played_days, streaks, tag_stats
 
 
 class HandPagination(CursorPagination):
     # A cursor, not page numbers: new hands arrive at the top while the user pages down.
-    ordering = ("-played_at", "-id")
+    ordering = SORT_ORDERS["newest"]
     page_size = 50
     page_size_query_param = "page_size"
     max_page_size = 50
 
+    def get_ordering(self, request, queryset, view):
+        # The view validated `sort` when it built the queryset.
+        return SORT_ORDERS[request.query_params.get("sort") or "newest"]
+
 
 @extend_schema_view(get=extend_schema(parameters=[HandListQuerySerializer]))
 class HandListView(ListAPIView):
-    """The signed-in user's hands, most recent first, or those of a tag or a day."""
+    """The signed-in user's hands, most recent first, or narrowed by tags, days, decisions or results, or sorted."""
 
     serializer_class = HandSummarySerializer
     pagination_class = HandPagination
 
     def get_queryset(self):
-        hands = Hand.objects.filter(user=self.request.user).defer("replay")
+        hands = Hand.objects.filter(user=self.request.user).defer("replay", "facts")
         query = HandListQuerySerializer(data=self.request.query_params)
         query.is_valid(raise_exception=True)
-        tag, day = query.validated_data.get("tag"), query.validated_data.get("date")
-        if tag is not None or day is not None:
+        filters = query.validated_data
+        by_result = filters["sort"] in ("biggest_win", "biggest_loss")
+        if by_result or any(filters.get(name) for name in ("tag", "date", "since", "until", "stat", "result")):
             # As the home page counts them.
             hands = hands.filter(PLAYED)
-        if tag is not None:
-            hands = hands.filter(tag_filter(tag))
-        if day is not None:
-            start, end = day_bounds(day, query.validated_data.get("tz", UTC))
-            hands = hands.filter(played_at__gte=start, played_at__lt=end)
-        return hands
+        hands = narrow(hands, filters)
+        return hands.annotate(net_bb=hand_bb()) if by_result else hands
 
 
 class HandDetailView(RetrieveAPIView):
@@ -97,12 +98,6 @@ class StatsView(APIView):
         query = StatsQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         filters = query.validated_data
-        tz = filters.get("tz", UTC)
-        hands = Hand.objects.filter(PLAYED, user=request.user)
-        if "tag" in filters:
-            hands = hands.filter(tag_filter(filters["tag"]))
-        if "since" in filters:
-            hands = hands.filter(played_at__gte=day_bounds(filters["since"], tz)[0])
-        if "until" in filters:
-            hands = hands.filter(played_at__lt=day_bounds(filters["until"], tz)[1])
-        return Response(StatGroupSerializer(hero_stats(hands, filters["group_by"], tz), many=True).data)
+        hands = narrow(Hand.objects.filter(PLAYED, user=request.user), filters)
+        stats = hero_stats(hands, filters["group_by"], filters.get("tz", UTC))
+        return Response(StatGroupSerializer(stats, many=True).data)
