@@ -267,6 +267,16 @@ def extract(text):
     return hand
 
 
+def replay(hh, state, hero):
+    """The seats, events and board of a hand PokerKit is playing, as `extract` makes them, at a practice table.
+
+    Every hole card there is known, so `hero`'s are dealt face up and the
+    others' appear only when they are shown down.
+    """
+    walk = _Replay(hh, state, {}, {}, hero=hero)
+    return {"players": walk.players(), "events": walk.events, "board": walk.board, "street": walk.street}
+
+
 class _Replay:
     """Walks PokerKit's operations into the events the replay steps through.
 
@@ -275,7 +285,7 @@ class _Replay:
     their called bet, which PokerKit gives back separately.
     """
 
-    def __init__(self, hh, state, dead_blinds, mucked):
+    def __init__(self, hh, state, dead_blinds, mucked, hero=None):
         self.hh = hh
         self.names = list(hh.players)
         count = len(self.names)
@@ -291,7 +301,8 @@ class _Replay:
         self.board_cards = []
         self.street = "preflop"
         self.events = []
-        self.hero = ""
+        self.hero = hero or ""
+        self.known_hero = hero is not None
         self.dead_blinds = dead_blinds
         self.mucked = mucked
         self.hand_type = hh.create_game().hand_types[0]
@@ -328,9 +339,11 @@ class _Replay:
                 all_in = self.put_in(p, amount)
                 self.add("post", p, blind=self.blind_name(p), amount=amount, all_in=all_in)
             case HoleDealing(player_index=p, cards=cards) if known(cards):
-                self.hero = self.names[p]  # a history deals known cards to its own player only
-                self.cards[p] = card_names(cards)
-                self.add("deal", p, cards=self.cards[p])
+                if not self.known_hero:
+                    self.hero = self.names[p]  # a history deals known cards to its own player only
+                if self.names[p] == self.hero:
+                    self.cards[p] = card_names(cards)
+                    self.add("deal", p, cards=self.cards[p])
             case BoardDealing(cards=cards):
                 self.board_cards += cards
                 self.board = card_names(self.board_cards)
