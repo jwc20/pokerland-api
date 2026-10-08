@@ -1,8 +1,10 @@
 import datetime
+import importlib
 import statistics
 import uuid
 from unittest import mock
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.test import SimpleTestCase
@@ -161,6 +163,23 @@ class HandTests(APITestCase):
 
     def test_hands_need_a_signed_in_user(self):
         self.assertEqual(APIClient().get("/api/hands/").status_code, 401)
+
+    def test_the_pot_and_the_rake_have_columns(self):
+        hand = Hand.objects.get(hand_id="262289806991")
+
+        self.assertEqual((hand.total_pot, hand.rake), (hand.replay["total_pot"], hand.replay["rake"]))
+        self.assertEqual((hand.total_pot, hand.rake), (2800, 154))
+
+    def test_the_migration_copies_the_pot_and_the_rake_from_the_replay(self):
+        Hand.objects.update(total_pot=0, rake=0)
+
+        importlib.import_module("hands.migrations.0004_hand_rake").copy_from_replay(django_apps, None)
+
+        self.assertEqual(
+            {(hand.total_pot, hand.rake) for hand in Hand.objects.all()},
+            {(hand.replay["total_pot"], hand.replay["rake"]) for hand in Hand.objects.all()},
+        )
+        self.assertFalse(Hand.objects.filter(rake=0).exists())
 
     def test_storing_a_hand_again_updates_it_in_place(self):
         hand = Hand.objects.get(hand_id="262289806991")
@@ -456,6 +475,53 @@ class StatsTests(APITestCase):
         results = Hand.objects.filter(hero_position="BTN").values_list("hero_net", "big_blind")
 
         self.assertAlmostEqual(group["bb_stdev"], statistics.stdev(net / bb for net, bb in results), delta=0.01)
+
+    def test_by_cash_game_stakes_chips_first_then_by_size(self):
+        groups = self.stats(group_by="stakes")
+
+        self.assertEqual(
+            [(group["key"], group["hands"], group["net_bb"]) for group in groups],
+            [(":10:20", 1, -0.5), (":100:200", 12, -200.69), ("EUR:2:5", 1, 18.2), ("USD:5:10", 1, 38.3)],
+        )
+
+    def test_the_rake_won_pots_pay_and_the_share_by_what_went_in(self):
+        # The hero won the whole $8.09 pot with $0.40 of it in, and the house took $0.24: 2.4 bb out of their
+        # winnings, which they would have had without a rake. Their share by what they put in is 40.2 × 24 ÷ 809.
+        [usd] = self.stats(tag="stakes:USD:5:10")
+
+        self.assertEqual((usd["net_bb"], usd["net_before_rake_bb"], usd["rake_bb"]), (38.3, 40.7, 1.19))
+
+    def test_a_lost_pot_still_pays_a_share_of_the_rake(self):
+        # Ten raked play money pots, of which the hero won one, alone: its 275 chips of rake were 1.375 bb.
+        [chips] = self.stats(tag="stakes::100:200")
+
+        self.assertEqual((chips["net_bb"], chips["rake_bb"], chips["net_before_rake_bb"]), (-200.69, 10.93, -199.32))
+
+    def test_the_net_adjusted_for_all_in_equity(self):
+        [group] = self.stats()
+
+        # Four all-ins before the river: aces against a bigger ace, queens three ways, eights three ways, and
+        # ace-king against queens on a king-high flop, the luck of which comes out.
+        rows = HandPlayer.objects.filter(is_hero=True, ev_net_bb__isnull=False)
+        luck = sum(row.net_bb - row.ev_net_bb for row in rows)
+        self.assertEqual(group["all_ins"], 4)
+        self.assertAlmostEqual(group["ev_net_bb"], group["net_bb"] - luck, places=1)
+
+    def test_the_hands_list_and_detail_carry_the_heros_equity(self):
+        hand = Hand.objects.get(hand_id="219396263497")
+
+        listed = self.client.get("/api/hands/", {"tag": "stakes:USD:5:10"}).data["results"][0]
+        detail = self.client.get(f"/api/hands/{hand.pk}/").data
+
+        self.assertEqual((listed["hero_allin_equity"], detail["hero_allin_equity"]), (0.9121, 0.9121))
+        self.assertAlmostEqual(detail["hero_ev_net_bb"], 31.4, places=1)
+        plain = Hand.objects.get(hand_id="262289822697")  # no all-in
+        self.assertIsNone(self.client.get(f"/api/hands/{plain.pk}/").data["hero_allin_equity"])
+
+    def test_tournaments_have_no_rake(self):
+        [group] = self.stats(tag="format:tournament")
+
+        self.assertEqual((group["rake_bb"], group["net_before_rake_bb"]), (0, group["net_bb"]))
 
     def test_bad_filters_are_rejected(self):
         for params in ({"group_by": "table"}, {"tag": "nope"}, {"since": "2026-10-02", "until": "2026-10-01"}):

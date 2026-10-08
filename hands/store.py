@@ -2,9 +2,11 @@
 
 from django.db import transaction
 
+from hands import sessions
 from hands.models import Hand, HandPlayer
 
-# Hand fields that come straight from the parser; the rest of a parsed hand goes in `replay`.
+# Hand fields that come straight from the parser; the rest of a parsed hand goes in `replay`, with the pot and
+# the rake again, which the replay shows.
 COLUMNS = (
     "site",
     "hand_id",
@@ -21,6 +23,8 @@ COLUMNS = (
     "hero_cards",
     "hero_net",
     "final_street",
+    "total_pot",
+    "rake",
     "phh",
 )
 REPLAY = ("max_seats", "button_seat", "ante", "total_pot", "rake", "board", "players", "events")
@@ -40,7 +44,8 @@ FACT_COLUMNS = (
 def store_hands(stream, hands):
     """Saves hands parsed from `stream`, updating any already saved, e.g. by an earlier parse.
 
-    Each hand's HandPlayer rows are replaced, in the same transaction.
+    Each hand's HandPlayer rows are replaced, and the sessions around the hands rebuilt (hands.sessions), in the
+    same transaction.
     """
     by_id = {(hand["site"], hand["hand_id"]): hand for hand in hands}  # one row per hand, as the upsert requires
     rows = [
@@ -69,3 +74,4 @@ def store_hands(stream, hands):
             for key, hand in by_id.items()
             for row in hand["facts"]["players"]
         )
+        sessions.assign(stream.user_id, [hand["played_at"] for hand in by_id.values()])

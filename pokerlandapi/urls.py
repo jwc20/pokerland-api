@@ -3,7 +3,16 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from hands.views import StatsView
+from hands.views import (
+    CoachPresetsView,
+    LeaksView,
+    PurposeStatsView,
+    ReviewView,
+    SessionDetailView,
+    SessionListView,
+    SessionPatternsView,
+    StatsView,
+)
 from pokerlandapi import schema  # noqa: F401  registers the OpenAPI extensions
 from pokerlandapi.views import RegisterView
 
@@ -17,6 +26,13 @@ urlpatterns = [
     path("api/tracker/", include("tracker.urls")),
     path("api/hands/", include("hands.urls")),
     path("api/stats/", StatsView.as_view(), name="stats"),
+    path("api/stats/purposes/", PurposeStatsView.as_view(), name="purpose-stats"),
+    path("api/review/", ReviewView.as_view(), name="review"),
+    path("api/leaks/", LeaksView.as_view(), name="leaks"),
+    path("api/leaks/presets/", CoachPresetsView.as_view(), name="coach-presets"),
+    path("api/sessions/", SessionListView.as_view(), name="session-list"),
+    path("api/sessions/patterns/", SessionPatternsView.as_view(), name="session-patterns"),
+    path("api/sessions/<int:pk>/", SessionDetailView.as_view(), name="session-detail"),
     path("api/practice/", include("practice.urls")),
 ]
 

@@ -1,4 +1,4 @@
-"""What the web app narrows a user's hands to: tags, days in their time zone, decisions and results."""
+"""What the web app narrows a user's hands to: tags, days in their time zone, decisions, results and notes."""
 
 import datetime
 import functools
@@ -124,4 +124,11 @@ def narrow(hands, filters):
         hands = hands.filter(stat_filter(filters["stat"], filters.get("did")))
     if "result" in filters:
         hands = hands.filter(RESULTS[filters["result"]])
+    # A hand has one review state and each tag once, so neither join repeats a hand.
+    if "review" in filters:
+        hands = hands.filter(notes__kind="review", notes__value=filters["review"])
+    if "note_tag" in filters:
+        hands = hands.filter(notes__kind="tag", notes__value=filters["note_tag"])
+    if "session" in filters:
+        hands = hands.filter(session_id=filters["session"])
     return hands

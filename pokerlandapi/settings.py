@@ -129,6 +129,9 @@ SPECTACULAR_SETTINGS = {
         "MatchOpponentEnum": "practice.models.CoachedMatch.OPPONENTS",
         "MatchCoachEnum": "practice.models.CoachedMatch.COACH",
         "NoteAuthorEnum": "practice.serializers.AUTHORS",
+        "HandNoteKindEnum": "hands.models.HandNote.Kind",
+        "NotePurposeEnum": "hands.notes.PURPOSES",
+        "ReviewStateEnum": "hands.notes.REVIEW_STATES",
     },
 }
 

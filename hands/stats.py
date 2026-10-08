@@ -3,8 +3,8 @@
 import datetime
 import math
 
-from django.db.models import Count, F, FloatField, Q, Sum
-from django.db.models.functions import Cast, TruncDate, TruncMonth
+from django.db.models import Count, F, FloatField, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Cast, Coalesce, NullIf, TruncDate, TruncMonth
 
 from hands.filters import FORMAT, stakes_value, tag_key
 from hands.models import HandPlayer
@@ -14,8 +14,8 @@ from tracker.parsing.facts import POSTFLOP_ACTIONS, STATS
 Z95 = 1.96
 # Positions from the first to act before the flop to the last; any other sorts after them.
 POSITION_ORDER = ("UTG", "UTG+1", "UTG+2", "UTG+3", "UTG+4", "LJ", "HJ", "CO", "BTN", "SB", "BB")
-# What /api/stats/ can group the hero's hands by.
-STAT_GROUPINGS = ("none", "position", "month")
+# What /api/stats/ can group the hero's hands by. Stakes are cash games' alone: tournament blinds go up every level.
+STAT_GROUPINGS = ("none", "position", "month", "stakes")
 
 
 def hand_bb():
@@ -140,13 +140,47 @@ def proportion(did, could):
     }
 
 
+def _chips(column):
+    return Cast(column, FloatField())
+
+
+def rake_share():
+    """A HandPlayer's share of their hand's rake, in big blinds: the rake split by what each player put in.
+
+    So a player pays some of the rake in a pot they lose: the "weighted
+    contributed" way of counting it. Nothing for a hand without a pot.
+    """
+    return _chips("hand__rake") * F("invested_bb") / NullIf(_chips("hand__total_pot"), 0.0)
+
+
+def rake_from_wins():
+    """The rake taken from what a HandPlayer won, in big blinds: added back, their result had there been no rake.
+
+    The rake comes out of every pot at the same rate (tracker.parsing.pokerstars.rake_by_pot),
+    so a winner's part of it is the rake × their share of what all the winners got.
+    """
+    won = F("invested_bb") + F("net_bb")
+    return _chips("hand__rake") * won / NullIf(_chips(F("hand__total_pot") - F("hand__rake")), 0.0)
+
+
+def with_hero_all_in(hands):
+    """`hands` with their hero's equity when the money went in before the river, `hero_allin_equity` (null in
+    every other hand), and the net they could expect then, `hero_ev_net_bb`."""
+    hero = HandPlayer.objects.filter(hand=OuterRef("pk"), is_hero=True)
+    return hands.annotate(
+        hero_allin_equity=Subquery(hero.values("allin_equity")[:1]),
+        hero_ev_net_bb=Subquery(hero.values("ev_net_bb")[:1]),
+    )
+
+
 def hero_stats(hands, group_by="none", tz=None):
-    """The hero's statistics over `hands`, in one group, or one per position or per month in `tz`.
+    """The hero's statistics over `hands`, in one group, or one per position, per month in `tz`, or per cash stakes.
 
     Each group has its hands, their net and its spread in big blinds (as the
-    tags have them), and every statistic of tracker.parsing.facts.STATS as a
-    proportion, with the aggression frequency after the flop:
-    (bets + raises) ÷ (bets + raises + calls + folds).
+    tags have them), the rake (`rake_share`, and the net before it), the net
+    adjusted for all-in equity with its all-ins, and every statistic of
+    tracker.parsing.facts.STATS as a proportion, with the aggression frequency
+    after the flop: (bets + raises) ÷ (bets + raises + calls + folds).
     """
     rows = HandPlayer.objects.filter(is_hero=True, hand__in=hands)
     counted = [f"{stat}_{part}" for stat in STATS for part in ("could", "did")]
@@ -156,6 +190,11 @@ def hero_stats(hands, group_by="none", tz=None):
         "hands": Count("id"),
         "total_bb": Sum("net_bb", default=0.0),
         "total_bb_squares": Sum(F("net_bb") * F("net_bb"), default=0.0),
+        "total_rake_bb": Sum(rake_share(), default=0.0),
+        "total_rake_from_wins_bb": Sum(rake_from_wins(), default=0.0),
+        # A4: the net expected when the money went in before the river, else the net.
+        "total_ev_bb": Sum(Coalesce("ev_net_bb", "net_bb"), default=0.0),
+        "total_all_ins": Count("id", filter=Q(ev_net_bb__isnull=False)),
         **{f"total_{column}": Sum(column, default=0) for column in counted},
     }
     if group_by == "position":
@@ -165,6 +204,13 @@ def hero_stats(hands, group_by="none", tz=None):
     elif group_by == "month":
         months = rows.annotate(month=TruncMonth("hand__played_at", tzinfo=tz)).values("month").annotate(**sums)
         groups = [(row.pop("month").strftime("%Y-%m"), row) for row in months.order_by("month")]
+    elif group_by == "stakes":
+        blinds = ("hand__currency", "hand__big_blind", "hand__small_blind")  # chips first, then by size
+        cash = rows.filter(hand__tournament_id="").values(*blinds).annotate(**sums).order_by(*blinds)
+        groups = [
+            (stakes_value(row.pop("hand__currency"), row.pop("hand__small_blind"), row.pop("hand__big_blind")), row)
+            for row in cash
+        ]
     else:
         groups = [("all", rows.aggregate(**sums))]
     return [_stat_group(key, totals) for key, totals in groups]
@@ -181,5 +227,9 @@ def _stat_group(key, sums):
         "hands": total["hands"],
         "net_bb": round(total["bb"], 2),
         "bb_stdev": None if stdev is None else round(stdev, 2),
+        "rake_bb": round(total["rake_bb"], 2),
+        "net_before_rake_bb": round(total["bb"] + total["rake_from_wins_bb"], 2),
+        "ev_net_bb": round(total["ev_bb"], 2),
+        "all_ins": total["all_ins"],
         "stats": stats,
     }

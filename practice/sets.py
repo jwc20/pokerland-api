@@ -19,7 +19,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from hands.filters import PLAYED
-from hands.models import Hand
+from hands.models import Hand, HandNote
 from hands.stats import proportion, streaks
 from practice import generators
 from practice.models import Attempt, Playbook, Review, Scenario, ScenarioSet, SetItem
@@ -31,6 +31,7 @@ from practice.spots import POSTFLOP, decisions
 DAILY_SIZE = 8
 MIN_AGE = datetime.timedelta(days=1)
 RECENT_HANDS = 400  # how far back today's set looks for decisions
+QUEUED = 6  # added to the interest of a decision in a hand flagged to review: more than any one other reason
 # Days until a spot in each Leitner box comes back; out of the last box, it is learnt.
 BOXES = {1: 1, 2: 3, 3: 7, 4: 14, 5: 30}
 WEIGHTS = {"exact": 1.0, "reference": 1.0, "rule": 0.5, "reflection": 0.0}
@@ -141,20 +142,24 @@ def interest(context, rules):
 def own_decisions(user, rng, now=None):
     """The user's decisions from their recent hands at least a day old, the most worth studying first.
 
+    Hands the user flagged to review (E1) come in however long ago they were played, and their decisions first.
     Each is (score, hand, data, context); decisions already made into spots are left out.
     """
     now = now or timezone.now()
     rules = house_playbook().rules
     hands = Hand.objects.filter(PLAYED, user=user, played_at__lt=now - MIN_AGE).order_by("-played_at")
+    queued = hands.filter(notes__kind=HandNote.Kind.REVIEW, notes__value="to_review")
+    recent = list(hands[:RECENT_HANDS])
+    flagged = set(queued.values_list("pk", flat=True))
     taken = set(Scenario.objects.filter(owner=user, source="own_hand").values_list("hand_id", "step"))
     found = []
-    for hand in hands[:RECENT_HANDS]:
+    for hand in [*recent, *queued.exclude(pk__in=[hand.pk for hand in recent])]:
         data = hand_data(hand)
         for context in decisions(data):
             if (hand.pk, context["step"]) in taken:
                 continue
             if score := interest(context, rules):
-                found.append((score + rng.random(), hand, data, context))
+                found.append((score + (QUEUED if hand.pk in flagged else 0) + rng.random(), hand, data, context))
     found.sort(key=lambda item: item[0], reverse=True)
     return found
 

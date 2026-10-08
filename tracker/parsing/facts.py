@@ -14,6 +14,8 @@ from collections import Counter
 
 from pokerkit import OmahaHoldemHand, StandardHighHand
 
+from tracker.parsing import equity
+
 RANKS = "23456789TJQKA"
 MOVES = {"fold", "check", "call", "bet", "raise"}
 AGGRESSIVE = {"bet", "raise"}
@@ -59,12 +61,16 @@ _PREMIUM = {"AA", "KK", "QQ", "AK"}
 _TROUBLE = {"AJ", "AT", "KQ", "KJ", "KT", "QJ", "QT", "JT"}  # good-looking hands that are often dominated
 
 
-def hand_facts(hand):
-    """The facts of a hand from `pokerstars.extract`: {"hand": Hand columns, "players": HandPlayer rows}."""
+def hand_facts(hand, with_equity=True):
+    """The facts of a hand from `pokerstars.extract`: {"hand": Hand columns, "players": HandPlayer rows}.
+
+    With `with_equity`, a hand whose money went in before the river with every live hand shown also gets each live
+    player's equity and expected result then (tracker.parsing.equity.all_in).
+    """
     walk = _Walk(hand)
     for event in hand["events"]:
         walk.apply(event)
-    return {"hand": walk.hand_columns(), "players": walk.player_rows()}
+    return {"hand": walk.hand_columns(), "players": walk.player_rows(equity.all_in(hand) if with_equity else None)}
 
 
 class _Player:
@@ -92,6 +98,14 @@ class _Player:
         self.checked_on = set()  # streets on which the player has checked
         self.check_raise_chances = set()
         self.sizes = []  # each bet and raise: [street, chips put in ÷ the pot before it]
+        # Raises before the flop, for the discipline checks (hands.leaks): an open, the first raise, over any
+        # limpers, raised to so many big blinds; a 3-bet, so many times the raise it re-raised, with that raise's
+        # callers; and whether the player's first raise put them all-in.
+        self.open_bb = None
+        self.open_limpers = None
+        self.three_bet_x = None
+        self.three_bet_callers = None
+        self.first_raise_all_in = None
 
     def chance(self, stat, did):
         could, done = self.counts[stat]
@@ -208,6 +222,7 @@ class _Walk:
     def move(self, player, kind, amount, all_in):
         """Puts the player's chips in and moves the betting on."""
         raising = kind in AGGRESSIVE
+        faced = self.top()  # the bet to match, before this move
         player.actions[self.street][_ACTION_COUNT[kind]] += 1
         if raising:
             before = self.pot + sum(other.bet for other in self.players.values())
@@ -220,6 +235,8 @@ class _Walk:
         self.acted_here.add(player.name)
         if self.street == "preflop":
             player.voluntary = player.voluntary or kind in ("call", "bet", "raise")
+            if raising:
+                self.preflop_size(player, faced, all_in)
             player.raised = player.raised or raising
             if raising:
                 if not self.raisers and self.callers == 0 and player.position in STEAL_POSITIONS:
@@ -232,6 +249,17 @@ class _Walk:
         if raising:
             self.raises_here += 1
             self.aggressors[self.street] = player.name
+
+    def preflop_size(self, player, faced, all_in):
+        """Notes the size of the player's raise before the flop, made to `player.bet` over a bet of `faced`."""
+        if not player.raised:
+            player.first_raise_all_in = all_in
+        if not self.raisers:
+            player.open_bb = round(player.bet / self.bb, 3)
+            player.open_limpers = self.callers
+        elif len(self.raisers) == 1 and faced:
+            player.three_bet_x = round(player.bet / faced, 3)
+            player.three_bet_callers = self.callers
 
     def new_street(self, event):
         for player in self.players.values():
@@ -322,9 +350,13 @@ class _Walk:
         antes = sum(event["amount"] for event in self.hand["events"] if event.get("blind") == "ante")
         return round(player.start / (self.hand["small_blind"] + self.hand["big_blind"] + antes), 2)
 
-    def player_rows(self):
+    def player_rows(self, all_in=None):
+        """Every player's row; `all_in` holds the live players' equity when the money went in, if it was known."""
+        # The house rakes every pot at the same rate, so a player expects that much less of what they win.
+        kept = 1 - self.hand.get("rake", 0) / self.hand["total_pot"] if self.hand.get("total_pot") else 1
         rows = []
         for player in self.players.values():
+            ev = (all_in or {}).get(player.name)
             if player.acted:
                 player.counts["vpip"] = (1, int(player.voluntary))
                 player.counts["pfr"] = (1, int(player.raised))
@@ -349,6 +381,13 @@ class _Walk:
                     "invested_bb": (player.won - player.net) / self.bb,
                     "net_bb": player.net / self.bb,
                     "allin_street": player.all_in_street or "",
+                    "open_bb": player.open_bb,
+                    "open_limpers": player.open_limpers,
+                    "three_bet_x": player.three_bet_x,
+                    "three_bet_callers": player.three_bet_callers,
+                    "first_raise_all_in": player.first_raise_all_in,
+                    "allin_equity": None if ev is None else round(ev["equity"], 4),
+                    "ev_net_bb": None if ev is None else (ev["expected"] * kept - ev["invested"]) / self.bb,
                     "extra": {
                         "actions": {street: dict(counts) for street, counts in player.actions.items() if counts},
                         "sizes": player.sizes,

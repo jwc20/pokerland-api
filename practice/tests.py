@@ -1,4 +1,5 @@
 import datetime
+import random
 from io import StringIO
 from unittest import mock
 
@@ -7,7 +8,7 @@ from django.core.management import call_command
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
 
-from hands.models import Hand
+from hands.models import Hand, HandNote
 from hands.tests import add_stream, schema_properties
 from practice import sets
 from practice.models import Attempt, Review, RuleProgress, Scenario, ScenarioSet
@@ -255,6 +256,16 @@ class ModeSetTests(PracticeTestCase):
         response = self.client.post("/api/practice/sets/", {"kind": "generated"}, format="json")
 
         self.assertEqual(response.status_code, 400)
+
+    def test_hands_flagged_to_review_come_first_however_long_ago(self):
+        flagged = Hand.objects.get(hand_id="262289811345")
+        HandNote.objects.create(user=self.user, hand=flagged, kind="review", value="to_review")
+
+        with mock.patch.object(sets, "RECENT_HANDS", 1):  # only the latest hand counts as recent
+            picked = sets.own_decisions(self.user, random.Random(1))
+
+        self.assertEqual(picked[0][1], flagged)
+        self.assertEqual({hand.hand_id for _, hand, _, _ in picked}, {"262300000002", "262289811345"})
 
 
 class ProfileTests(PracticeTestCase):

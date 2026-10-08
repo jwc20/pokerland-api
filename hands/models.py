@@ -29,6 +29,9 @@ class Hand(models.Model):
     hero_cards = models.JSONField(default=list, blank=True)
     hero_net = models.BigIntegerField(default=0)
     final_street = models.CharField(max_length=32)
+    # Also in `replay`; columns so the rake can be summed without reading every replay.
+    total_pot = models.BigIntegerField(default=0)  # every chip put in, the rake included
+    rake = models.BigIntegerField(default=0)  # what the house took from the pot
     replay = models.JSONField(default=dict)
     phh = models.TextField(blank=True)
     # What the hero's decisions faced (tracker.parsing.facts). `facts` holds the pot, the stacks and the
@@ -41,6 +44,11 @@ class Hand(models.Model):
     effective_bb = models.FloatField(null=True, blank=True)  # the most the hero could lose, in big blinds
     hero_m = models.FloatField(null=True, blank=True)  # Harrington's M, in tournaments
     facts = models.JSONField(default=dict, blank=True)
+    # The session it belongs to (hands.sessions), whole hours since that began, and how many tables the user was
+    # playing at once then. Null for a hand the user sat out.
+    session = models.ForeignKey("Session", null=True, blank=True, on_delete=models.SET_NULL, related_name="hand_set")
+    session_hour = models.PositiveSmallIntegerField(null=True, blank=True)
+    tables_open = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -148,6 +156,19 @@ class HandPlayer(models.Model):
     invested_bb = models.FloatField(default=0)
     net_bb = models.FloatField(default=0)
     allin_street = models.CharField(max_length=16, blank=True)
+    # Raises before the flop, for the discipline checks (hands.leaks): the open (the first raise, over any
+    # limpers) in big blinds and its limpers; a 3-bet as a multiple of the raise it re-raised, and that raise's
+    # callers; whether the first raise was all-in. Null without such a raise.
+    open_bb = models.FloatField(null=True, blank=True)
+    open_limpers = models.PositiveSmallIntegerField(null=True, blank=True)
+    three_bet_x = models.FloatField(null=True, blank=True)
+    three_bet_callers = models.PositiveSmallIntegerField(null=True, blank=True)
+    first_raise_all_in = models.BooleanField(null=True, blank=True)
+    # When the money went in before the river with every live hand shown (tracker.parsing.equity.all_in): the
+    # player's share of the pots they could win, and the net they could expect then, rake taken, in big blinds.
+    # Null in every other hand, whose expected net is the net.
+    allin_equity = models.FloatField(null=True, blank=True)
+    ev_net_bb = models.FloatField(null=True, blank=True)
     extra = models.JSONField(default=dict, blank=True)  # action counts by street, bet sizes, M
 
     class Meta:
@@ -159,3 +180,81 @@ class HandPlayer(models.Model):
 
     def __str__(self):
         return f"{self.name} in {self.hand}"
+
+
+class Session(models.Model):
+    """A stretch of play (F1): a user's hands with no gap longer than hands.sessions.GAP between one and the next,
+    at any table. hands.sessions builds it as hands are stored, and keeps its counts."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sessions")
+    start = models.DateTimeField()  # the first hand's start
+    end = models.DateTimeField()  # the last hand's start
+    hands = models.PositiveIntegerField(default=0)
+    tables = models.PositiveSmallIntegerField(default=0)  # tables played at
+    most_tables = models.PositiveSmallIntegerField(default=0)  # the most at once
+    net_bb = models.FloatField(default=0)
+    net_bb_squares = models.FloatField(default=0)  # for the spread of the results
+    ev_net_bb = models.FloatField(default=0)  # adjusted for all-in equity, as hands.stats counts it
+    biggest_pot_bb = models.FloatField(default=0)
+
+    class Meta:
+        indexes = [models.Index(fields=("user", "-start"), name="session_start")]
+        ordering = ("-start", "-id")
+
+    def __str__(self):
+        return f"Session of {self.user} at {self.start:%Y-%m-%d %H:%M}"
+
+
+class CoachPresets(models.Model):
+    """A user's thresholds for the leak checks, where they differ from the course values in hands.leaks.PRESETS."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coach_presets")
+    values = models.JSONField(default=dict, blank=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Coach presets of {self.user}"
+
+
+class HandNote(models.Model):
+    """What a user wrote on one of their hands (FND-7 of the feature ideas): a note, a tag, the hand's review
+    state, or why they made one of their bets or raises (E1).
+
+    Notes hang on the hand's row, which a reparse updates in place, so they outlast it; deleting the hand deletes
+    them. A hand has one note per street (and one on the whole hand), each tag once, one review state, and one
+    purpose per bet.
+    """
+
+    class Kind(models.TextChoices):
+        NOTE = "note"  # `text`, on one `street`, or on the whole hand when it is empty
+        TAG = "tag"  # `value`: "cooler", "misclick", or a tag of the user's own
+        REVIEW = "review"  # `value`: to_review, then reviewed
+        PURPOSE = "purpose"  # `value`: why the hero made their bet or raise number `bet`; `street` is its street
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="hand_notes")
+    hand = models.ForeignKey(Hand, on_delete=models.CASCADE, related_name="notes")
+    kind = models.CharField(max_length=16, choices=Kind)
+    street = models.CharField(max_length=16, blank=True)
+    # Which of the hero's bets and raises a purpose is for, counted from 0 in the order they made them: unlike a
+    # replay step, it stays put if a new parser adds events.
+    bet = models.PositiveSmallIntegerField(null=True, blank=True)
+    value = models.CharField(max_length=32, blank=True)
+    text = models.TextField(blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("hand", "street"), condition=models.Q(kind="note"), name="one_note_per_street"
+            ),
+            models.UniqueConstraint(fields=("hand", "value"), condition=models.Q(kind="tag"), name="each_tag_once"),
+            models.UniqueConstraint(fields=("hand",), condition=models.Q(kind="review"), name="one_review_state"),
+            models.UniqueConstraint(
+                fields=("hand", "bet"), condition=models.Q(kind="purpose"), name="one_purpose_per_bet"
+            ),
+        ]
+        indexes = [models.Index(fields=("user", "kind", "value"), name="hand_note_value")]
+
+    def __str__(self):
+        return f"{self.kind} on {self.hand}"

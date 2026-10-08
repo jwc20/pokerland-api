@@ -1,8 +1,10 @@
 from rest_framework import serializers
 
 from hands.filters import HAND_RESULTS, HAND_SORTS, TAG_GROUPS, tag_filter, zone
-from hands.models import Hand
-from hands.stats import STAT_GROUPINGS
+from hands.leaks import CHECKS, LEAK_GROUPS, LEAK_KEYS, PRESETS, presets_of
+from hands.models import Hand, HandNote, Session
+from hands.notes import NOTE_LENGTH, NOTE_STREETS, PURPOSES, REVIEW_STATES, TAG_LENGTH, bets
+from hands.stats import STAT_GROUPINGS, sample_stdev
 from tracker.parsing.facts import STATS
 
 EVENT_TYPES = [
@@ -25,6 +27,16 @@ class HandSummarySerializer(serializers.ModelSerializer):
     """A row of the game history. Amounts are chips, or cents when `currency` is set."""
 
     hero_cards = serializers.ListField(child=serializers.CharField())
+    hero_allin_equity = serializers.FloatField(
+        allow_null=True,
+        help_text=(
+            "The hero's share of the pots they could win when the money went in before the river, every live hand "
+            "shown; null in every other hand."
+        ),
+    )
+    hero_ev_net_bb = serializers.FloatField(
+        allow_null=True, help_text="The hero's net in big blinds expected then, rake taken; null when equity is."
+    )
 
     class Meta:
         model = Hand
@@ -45,6 +57,8 @@ class HandSummarySerializer(serializers.ModelSerializer):
             "hero_cards",
             "hero_net",
             "final_street",
+            "hero_allin_equity",
+            "hero_ev_net_bb",
         )
         read_only_fields = fields  # so the schema marks them all as present
 
@@ -186,6 +200,18 @@ class HandListQuerySerializer(HandFilterSerializer):
         default="newest",
         help_text="Newest or oldest first, or by the hero's result in big blinds: the biggest wins or losses first.",
     )
+    review = serializers.ChoiceField(
+        choices=REVIEW_STATES, required=False, help_text="Only the hands flagged to review, or those reviewed."
+    )
+    note_tag = serializers.CharField(
+        required=False, max_length=TAG_LENGTH, help_text="Only the hands the user tagged with this, e.g. cooler."
+    )
+    leak = serializers.ChoiceField(
+        choices=tuple(CHECKS),
+        required=False,
+        help_text="Only the hands in which the hero broke this check's rule, as /api/leaks/ counts it.",
+    )
+    session = serializers.IntegerField(required=False, help_text="Only the hands of this session, by its id.")
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -194,14 +220,109 @@ class HandListQuerySerializer(HandFilterSerializer):
         return attrs
 
 
+class HandNoteSerializer(serializers.ModelSerializer):
+    """Something the user wrote on a hand: a note, a tag, its review state, or why they made a bet or raise."""
+
+    class Meta:
+        model = HandNote
+        fields = ("id", "kind", "street", "bet", "value", "text", "updated")
+        read_only_fields = fields
+        extra_kwargs = {
+            "street": {"help_text": "note: its street, empty for the whole hand. purpose: the bet's street."},
+            "bet": {"help_text": "purpose: which of the hero's bets and raises, counted from 0 in the order made."},
+            "value": {"help_text": "tag: the tag. review: to_review or reviewed. purpose: value, bluff, ..."},
+            "text": {"help_text": "note: what the user wrote."},
+        }
+
+
+class HandNoteWriteSerializer(serializers.Serializer):
+    """A note to add to a hand, or to change the one it takes the place of: the street's note, the same tag, the
+    review state, or the bet's purpose. Each kind takes its own fields."""
+
+    kind = serializers.ChoiceField(choices=HandNote.Kind.choices)
+    street = serializers.ChoiceField(
+        choices=NOTE_STREETS,
+        required=False,
+        allow_blank=True,
+        help_text="note: the street it is on; empty or left out for the whole hand.",
+    )
+    text = serializers.CharField(required=False, max_length=NOTE_LENGTH, help_text="note: what to say.")
+    tag = serializers.CharField(required=False, max_length=TAG_LENGTH, help_text="tag: a word or two, e.g. cooler.")
+    review = serializers.ChoiceField(choices=REVIEW_STATES, required=False, help_text="review: the hand's state.")
+    bet = serializers.IntegerField(
+        required=False, min_value=0, help_text="purpose: which of the hero's bets and raises, counted from 0."
+    )
+    purpose = serializers.ChoiceField(choices=PURPOSES, required=False, help_text="purpose: why they made it.")
+
+    def validate(self, attrs):
+        kind = attrs["kind"]
+        if kind == HandNote.Kind.NOTE:
+            text = attrs.get("text", "").strip()
+            if not text:
+                raise serializers.ValidationError({"text": "Write something, or delete the note."})
+            return {"kind": kind, "street": attrs.get("street", ""), "text": text}
+        if kind == HandNote.Kind.TAG:
+            tag = " ".join(attrs.get("tag", "").split()).lower()
+            if not tag:
+                raise serializers.ValidationError({"tag": "Give the tag a word."})
+            return {"kind": kind, "value": tag}
+        if kind == HandNote.Kind.REVIEW:
+            if "review" not in attrs:
+                raise serializers.ValidationError({"review": "Say to_review or reviewed."})
+            return {"kind": kind, "value": attrs["review"]}
+        if "purpose" not in attrs:
+            raise serializers.ValidationError({"purpose": "Say why the bet was made."})
+        hand = self.context["hand"]
+        made = bets(hand.replay.get("events", []), hand.hero) if hand.hero else []
+        if attrs.get("bet") is None or attrs["bet"] >= len(made):
+            raise serializers.ValidationError({"bet": "Not one of the hero's bets or raises in this hand."})
+        return {"kind": kind, "bet": attrs["bet"], "street": made[attrs["bet"]]["street"], "value": attrs["purpose"]}
+
+
+class ReviewHandSerializer(HandSummarySerializer):
+    """A hand in the review queue."""
+
+    flagged = serializers.DateTimeField(help_text="When it was flagged to review.")
+
+    class Meta(HandSummarySerializer.Meta):
+        fields = (*HandSummarySerializer.Meta.fields, "flagged")
+        read_only_fields = fields
+
+
+class NoteTagSerializer(serializers.Serializer):
+    tag = serializers.CharField()
+    hands = serializers.IntegerField()
+
+
+class ReviewQueueSerializer(serializers.Serializer):
+    """The user's review queue: the hands that nag them, which they flagged to look at again [JHU 4]."""
+
+    to_review = serializers.IntegerField(help_text="Hands flagged to review.")
+    reviewed = serializers.IntegerField(help_text="Hands reviewed since.")
+    queue = ReviewHandSerializer(many=True, help_text="The latest hands flagged to review, the latest first: up to 5.")
+    tags = NoteTagSerializer(many=True, help_text="The user's own tags, the most used first.")
+    suggested_tags = serializers.ListField(child=serializers.CharField(), help_text="Tags to offer anyone.")
+
+
 class HandDaysQuerySerializer(serializers.Serializer):
     tz = TimeZoneField(help_text='The IANA time zone days begin and end in, e.g. "Europe/London".')
+
+
+class DaySessionSerializer(serializers.Serializer):
+    """A session that was played on a day, in part or whole."""
+
+    id = serializers.IntegerField()
+    start = serializers.DateTimeField()
+    end = serializers.DateTimeField()
+    hands = serializers.IntegerField()
+    net_bb = serializers.FloatField()
 
 
 class HandDaySerializer(serializers.Serializer):
     date = serializers.DateField()
     hands = serializers.IntegerField()
     net_bb = serializers.FloatField(help_text="The day's result in big blinds.")
+    sessions = DaySessionSerializer(many=True, help_text="The sessions played that day, the first first.")
 
 
 class HandCalendarSerializer(serializers.Serializer):
@@ -250,7 +371,10 @@ class StatsQuerySerializer(HandFilterSerializer):
     group_by = serializers.ChoiceField(
         choices=STAT_GROUPINGS,
         default="none",
-        help_text="One group of all the hands, or one per position, or one per month in `tz`.",
+        help_text=(
+            "One group of all the hands, or one per position, one per month in `tz`, or one per cash-game stakes "
+            "(leaving out tournaments, whose blinds go up every level)."
+        ),
     )
 
 
@@ -280,9 +404,14 @@ StatSetSerializer = type(
 
 
 class StatGroupSerializer(serializers.Serializer):
-    """The hero's statistics over a group of their hands: all of them, a position's, or a month's."""
+    """The hero's statistics over a group of their hands: all of them, a position's, a month's, or a stakes'."""
 
-    key = serializers.CharField(help_text='"all", a position such as "BTN", or a month such as "2026-10".')
+    key = serializers.CharField(
+        help_text=(
+            '"all", a position such as "BTN", a month such as "2026-10", or stakes as a stakes tag\'s value: '
+            '"USD:5:10" (currency:small blind:big blind), ":100:200" for chips.'
+        )
+    )
     hands = serializers.IntegerField()
     net_bb = serializers.FloatField(help_text="Their results summed in big blinds.")
     bb_stdev = serializers.FloatField(
@@ -292,4 +421,193 @@ class StatGroupSerializer(serializers.Serializer):
             "Null for fewer than two hands."
         ),
     )
+    rake_bb = serializers.FloatField(
+        help_text=(
+            "The hero's share of the rake, in big blinds: each pot's rake split by what the players put in, "
+            "so some is paid in pots lost too."
+        )
+    )
+    ev_net_bb = serializers.FloatField(
+        help_text=(
+            "net_bb adjusted for all-in equity: in a hand where the money went in before the river with every live "
+            "hand shown, the net the hero could expect then; else the net."
+        )
+    )
+    all_ins = serializers.IntegerField(help_text="Hands whose net is adjusted for all-in equity.")
+    net_before_rake_bb = serializers.FloatField(
+        help_text="net_bb with the rake taken from the pots the hero won added back: their results had there been none."
+    )
     stats = StatSetSerializer()
+
+
+class PurposeStatSerializer(serializers.Serializer):
+    """How the hero's bets and raises of one purpose went on one street."""
+
+    purpose = serializers.ChoiceField(choices=PURPOSES)
+    street = serializers.CharField()
+    bets = serializers.IntegerField()
+    took_pot = StatSerializer(help_text="Bets nobody called or raised, taking the pot at once, out of all of them.")
+    called = serializers.IntegerField(help_text="Bets called, and not raised.")
+    raised = serializers.IntegerField()
+    size = serializers.FloatField(
+        allow_null=True, help_text="Their average size, as a share of everything in the middle before them."
+    )
+    needed = serializers.FloatField(
+        allow_null=True,
+        help_text="The share of folds a pure bluff of the average size needs to break even: size ÷ (1 + size).",
+    )
+
+
+class LeakQuerySerializer(HandFilterSerializer):
+    """Which of the hero's hands /api/leaks/ checks, and which checks."""
+
+    group = serializers.ChoiceField(choices=LEAK_GROUPS, default="preflop", help_text="The checks before the flop.")
+
+
+class LeakMonthSerializer(serializers.Serializer):
+    month = serializers.CharField(help_text='A month such as "2026-10".')
+    did = serializers.IntegerField(help_text="Times the rule was broken; for hands per orbit, the hands played.")
+    could = serializers.IntegerField(allow_null=True, help_text="The chances to keep it; null for hands per orbit.")
+    rate = serializers.FloatField(allow_null=True, help_text="Hands per orbit; null for the other checks.")
+
+
+class LeakSerializer(serializers.Serializer):
+    """A leak check over the hero's hands: how often they broke one of the lectures' rules of thumb (B3)."""
+
+    key = serializers.ChoiceField(choices=LEAK_KEYS)
+    group = serializers.ChoiceField(choices=LEAK_GROUPS)
+    share = StatSerializer(
+        allow_null=True, help_text="Times the rule was broken out of the chances to keep it; null for hands per orbit."
+    )
+    rate = serializers.FloatField(
+        allow_null=True,
+        help_text="hands_per_orbit: hands played (VPIP) per orbit, an orbit being as many hands as players dealt in.",
+    )
+    average = serializers.FloatField(
+        allow_null=True, help_text="open_size: the average open in big blinds. three_bet_size: in raises."
+    )
+    below = serializers.IntegerField(allow_null=True, help_text="Sizes: the chances taken smaller than the standard.")
+    above = serializers.IntegerField(allow_null=True, help_text="Sizes: the chances taken bigger than the standard.")
+    net_broken_bb = serializers.FloatField(allow_null=True, help_text="The net, in big blinds, of the hands broken.")
+    net_kept_bb = serializers.FloatField(allow_null=True, help_text="The net, in big blinds, of the other chances.")
+    months = LeakMonthSerializer(many=True, help_text="The trend: each month with chances, the oldest first.")
+
+
+class PresetSerializer(serializers.Serializer):
+    """A threshold of the leak checks: the user's value, the course value, and the range it may be set in."""
+
+    key = serializers.ChoiceField(choices=tuple(PRESETS))
+    value = serializers.FloatField()
+    default = serializers.FloatField(help_text="The course value.")
+    min = serializers.FloatField()
+    max = serializers.FloatField()
+    label = serializers.CharField()
+    source = serializers.CharField(allow_blank=True, help_text="The lectures it comes from, e.g. JHU 3.")
+
+
+def _validate_presets(self, attrs):
+    values = presets_of(self.context["user"]) | {
+        name: value for name, value in attrs.items() if value is not None
+    }
+    if values["orbit_min"] > values["orbit_max"]:
+        raise serializers.ValidationError({"orbit_min": "More than orbit_max."})
+    return attrs
+
+
+# A field per preset, within its range; null puts it back to the course value.
+PresetsUpdateSerializer = type(
+    "PresetsUpdateSerializer",
+    (serializers.Serializer,),
+    {
+        "__module__": __name__,
+        "__doc__": "New values for some of the leak checks' presets; null puts one back to the course value.",
+        **{
+            name: serializers.FloatField(
+                required=False,
+                allow_null=True,
+                min_value=preset["min"],
+                max_value=preset["max"],
+                help_text=preset["label"],
+            )
+            for name, preset in PRESETS.items()
+        },
+        "validate": _validate_presets,
+    },
+)
+
+
+class SessionSerializer(serializers.ModelSerializer):
+    """A stretch of play: the user's hands with no gap of more than half an hour between one and the next (F1)."""
+
+    minutes = serializers.SerializerMethodField(help_text="From the first hand's start to the last's.")
+    bb_stdev = serializers.SerializerMethodField(
+        help_text="The sample standard deviation of its hands' results in big blinds; null for fewer than two."
+    )
+    flagged = serializers.IntegerField(help_text="Its hands flagged to review.")
+    noted = serializers.IntegerField(help_text="Its hands with any note, tag, review state or purpose.")
+
+    class Meta:
+        model = Session
+        fields = (
+            "id",
+            "start",
+            "end",
+            "minutes",
+            "hands",
+            "tables",
+            "most_tables",
+            "net_bb",
+            "bb_stdev",
+            "ev_net_bb",
+            "biggest_pot_bb",
+            "flagged",
+            "noted",
+        )
+        read_only_fields = fields
+        extra_kwargs = {
+            "tables": {"help_text": "Tables played at."},
+            "most_tables": {"help_text": "The most tables played at once."},
+            "net_bb": {"help_text": "The result in big blinds."},
+            "ev_net_bb": {"help_text": "The result adjusted for all-in equity, as /api/stats/ counts it."},
+            "biggest_pot_bb": {"help_text": "The biggest pot, in big blinds."},
+        }
+
+    def get_minutes(self, session) -> int:
+        return round((session.end - session.start).total_seconds() / 60)
+
+    def get_bb_stdev(self, session) -> float | None:
+        stdev = sample_stdev(session.hands, session.net_bb, session.net_bb_squares)
+        return None if stdev is None else round(stdev, 2)
+
+
+class SessionQuerySerializer(serializers.Serializer):
+    """Which sessions to list: those that began within these days, in `tz`."""
+
+    since = serializers.DateField(required=False, help_text="Only the sessions begun from this day on.")
+    until = serializers.DateField(required=False, help_text="Only the sessions begun up to the end of this day.")
+    tz = TimeZoneField(required=False, help_text="The IANA time zone days are counted in; UTC if left out.")
+
+
+class SessionGroupSerializer(serializers.Serializer):
+    """The hero's hands in one part of their sessions, and how they went."""
+
+    key = serializers.CharField()
+    hands = serializers.IntegerField()
+    net_bb = serializers.FloatField(help_text="Their results summed in big blinds.")
+    bb_stdev = serializers.FloatField(
+        allow_null=True, help_text="The sample standard deviation of their results in big blinds."
+    )
+    ev_net_bb = serializers.FloatField(help_text="net_bb adjusted for all-in equity.")
+
+
+class SessionPatternsSerializer(serializers.Serializer):
+    """The hero's results set against when and how they played (F1)."""
+
+    hours_in = SessionGroupSerializer(
+        many=True, help_text='By whole hours into the session: "0" is the first hour, then "1", "2" and "3+".'
+    )
+    time_of_day = SessionGroupSerializer(
+        many=True, help_text="By the part of the day, in `tz`: night (0-6), morning, afternoon, evening (18-24)."
+    )
+    weekday = SessionGroupSerializer(many=True, help_text='By the day of the week, in `tz`: "1" is Monday, "7" Sunday.')
+    tables = SessionGroupSerializer(many=True, help_text='By the tables played at once: "1", "2", "3" or "4+".')

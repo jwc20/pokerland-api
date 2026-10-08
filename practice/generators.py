@@ -15,14 +15,14 @@ The players are "You" and "Villain"; the table labels them by position. Django-f
 """
 
 import math
-from itertools import combinations
 
-from pokerkit import Deck, StandardHighHand
-from pokerkit.analysis import calculate_equities, parse_range
+from pokerkit import Deck
+from pokerkit.analysis import parse_range
 
 from practice.questions import arithmetic
 from practice.spots import STRONG_DRAWS, pending
 from practice.table import TableHand
+from tracker.parsing.equity import range_share, shares, value
 from tracker.parsing.facts import draws, made_hand
 
 HERO, VILLAIN = "You", "Villain"
@@ -152,7 +152,7 @@ def _push_fold(rng, stack_bb, calling, key):
     text, described = RANGES[key]
     theirs = [combo for combo in parse_range(text) if not {repr(card) for card in combo} & set(yours)]
     share = len(theirs) / math.comb(50, 2)
-    equity, error = sampled_equity(yours, theirs)
+    equity, error = sampled_equity(yours, theirs, rng)
     if calling:
         # Folding gives up the big blind you posted; calling plays for both stacks.
         ev = {"call": equity * 2 * stack_bb - stack_bb, "fold": -1.0}
@@ -189,27 +189,16 @@ def _push_fold(rng, stack_bb, calling, key):
 
 def exact_equity(yours, theirs, board):
     """Your share of the pot against a known hand, every card to come counted: ties count half."""
-    seen = {*yours, *theirs, *board}
-    rest = [card for card in CARDS if card not in seen]
-    wins = total = 0
-    for run in combinations(rest, 5 - len(board)):
-        full = [*board, *run]
-        mine, other = _rank(yours, full), _rank(theirs, full)
-        wins += 1 if mine > other else 0.5 if mine == other else 0
-        total += 1
-    return wins / total
+    return shares([yours, theirs], board)[0][0]
 
 
-def sampled_equity(yours, combos):
+def sampled_equity(yours, combos, rng=None):
     """Your equity before the flop against a range of combos, sampled, and the sample's standard error."""
-    equity = calculate_equities(
-        (parse_range("".join(yours)), combos), (), 2, 5, Deck.STANDARD, (StandardHighHand,), sample_count=SAMPLES
-    )[0]
-    return equity, math.sqrt(max(equity * (1 - equity), 0.01) / SAMPLES)
+    return range_share(yours, combos, rng=rng, samples=SAMPLES)
 
 
 def _rank(hole, board):
-    return StandardHighHand.from_game("".join(hole), "".join(board))
+    return value(hole, board)
 
 
 def _drawing(hole, board):
