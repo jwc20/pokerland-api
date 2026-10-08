@@ -78,6 +78,16 @@ point a tracker at your local API, run `pokerland-tracker login --api http://loc
 | `GET /api/hands/days/?tz=<IANA zone>`                                 | cookies        | Each day's hands and result in big blinds in that time zone, with the current and best streak                                                       |
 | `GET /api/hands/tags/`                                                | cookies        | Hands counted by position, game, cash-game stakes and format, with won, lost and net big blinds                                                     |
 | `GET /api/stats/`                                                     | cookies        | The hero's statistics (VPIP, PFR, 3-bet, c-bet, ...) as did ÷ could with 95% Wilson intervals, for all hands or by `?group_by=position` or `month`; narrow with `?tag=` (repeatable), `?since=` and `?until=` |
+| `GET /api/practice/sets/today/?tz=`                                   | cookies        | Today's practice set, made the first time it is asked for: spots coming back for review, decisions from the user's own hands at least a day old and the arithmetic behind them, and generated spots. Answers stay on the server until a spot is answered |
+| `POST /api/practice/sets/`, `GET /api/practice/sets/<id>/`            | cookies        | A set of one mode (`my_hands`, or `generated` with a `skill`), and any of the user's sets with the answers given so far                             |
+| `POST /api/practice/attempts/`                                        | cookies        | Answers a spot: the grade (never by the card that came), the answer and how it was worked out. A miss comes back the next day                      |
+| `POST /api/practice/reviews/`                                         | cookies        | "Again later": the spot comes back in Leitner boxes, a day away at first and further after each good answer                                         |
+| `GET /api/practice/profile/?tz=`                                      | cookies        | Accuracy by skill with 95% Wilson ranges (a rule of thumb counts half, a reflection not at all), the practice streak and the reviews due             |
+| `GET /api/practice/playbooks/`, `GET /api/practice/playbooks/<id>/`   | cookies        | The playbooks, such as the house starter heads-up playbook; one's rule cards, and the user's coach stage in each rule family                         |
+| `GET /api/practice/hands/by-the-book/?playbook=`                      | cookies        | How often the user's last 1,000 hands at least a day old kept each rule, with 95% ranges; with `&rule=`, the decisions it applied to                 |
+| `GET, POST /api/practice/matches/`                                    | cookies        | The user's coached matches, and a new one: heads-up against a bot with a hidden style and leak (`opponent`), with the coach at the user's stage or pinned to one (`coach`) |
+| `GET /api/practice/matches/<id>/`; `POST` its `act/`, `intent/`, `ask/`, `next/`, `resign/`, `departure/` and `reads/` | cookies | A match as the player sees it, the coach saying as much as the stage allows; and each step in it: a move, a stage-2 intent, asking the coach, the next hand, ending the match, why a rule was left, a note on the read card |
+| `GET /api/practice/matches/<id>/debrief/`                             | cookies        | Once the match is over: the debrief, with the bot's style and leak revealed                                                                         |
 | `GET /api/tracker/status/`                                            | cookies        | What the user's trackers have uploaded: the last upload, files, hands, platforms and versions                                                       |
 | `GET /api/tracker/me/`, `GET /api/tracker/config/`                    | client token   | The token's user, and the settings a tracker fetches at startup and every few hours                                                                 |
 | `PUT /api/tracker/streams/<id>/`                                      | client token   | Registers a hand-history file, or tells a tracker how much of it the server has                                                                     |
@@ -109,6 +119,9 @@ flowchart LR
   `tracker_drain --reparse --all` after deploying it.
 - To require a newer tracker, raise `TRACKER_MIN_CLIENT_VERSION`. Older trackers then get 426 and show "update
   required", and the Windows tracker updates itself.
+- `uv run python manage.py practice_generate [--per-skill 50] [--skill push_fold]` fills the pool of generated
+  practice spots that every user shares. A push-or-fold spot samples its equity and takes about a second, so run it
+  after deploying rather than leave the spots to be made in a request.
 
 ## Configuration
 
@@ -157,6 +170,8 @@ pokerlandapi/   settings, root URLs, cookie JWT auth, registration, schema exten
 users/          the client tokens trackers sign in with
 tracker/        uploads (streams, chunks, raw storage, async parsing) and the parser in tracker/parsing/
 hands/          parsed hands and each player's facts, and the filters and stats behind the web app
+practice/       practice sets and their grading, the playbook's rules, and coached matches: PokerKit tables,
+                bots with leaks, the coach and the read card
 scripts/        deploy.py
 ```
 
