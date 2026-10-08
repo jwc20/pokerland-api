@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "users",
     "tracker",
     "hands",
+    "practice",
 ]
 
 MIDDLEWARE = [
@@ -122,6 +123,12 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "HandEventTypeEnum": "hands.serializers.EVENT_TYPES",
         "HandTagGroupEnum": "hands.filters.TAG_GROUPS",
+        "PracticeActionEnum": "practice.serializers.ACTIONS",
+        "PracticeSkillEnum": "practice.serializers.SKILL_CHOICES",
+        "GeneratedSkillEnum": "practice.serializers.GENERATED_SKILLS",
+        "MatchOpponentEnum": "practice.models.CoachedMatch.OPPONENTS",
+        "MatchCoachEnum": "practice.models.CoachedMatch.COACH",
+        "NoteAuthorEnum": "practice.serializers.AUTHORS",
     },
 }
 

@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/tracker/", include("tracker.urls")),
     path("api/hands/", include("hands.urls")),
     path("api/stats/", StatsView.as_view(), name="stats"),
+    path("api/practice/", include("practice.urls")),
 ]
 
 # The schema and Swagger UI describe every endpoint, so keep them out of prod.
