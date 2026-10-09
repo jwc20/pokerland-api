@@ -5,10 +5,13 @@ No database: like tracker.parsing they run on fixture files and on hands played 
 
 import random
 import warnings
+from types import SimpleNamespace
+from unittest import mock
 
 from django.test import SimpleTestCase
 
-from practice import bots, generators, rules
+from hands import ranges
+from practice import bots, charts, generators, library, ratings, rules, sets
 from practice.playbook import HOUSE, STARTER
 from practice.questions import arithmetic, money
 from practice.spots import decisions, hand_class, pending
@@ -303,6 +306,56 @@ class BotTests(SimpleTestCase):
         self.assertTrue(all(move[:2] == ["Bot", "raise"] for move in first))
 
 
+class ProfileBotTests(SimpleTestCase):
+    def play(self, profile, seats, hands=60, seed=5):
+        """Plays `hands` at a table of `seats`, the first seat by `profile` and the rest tight-aggressive: the share of
+        hands the first seat put money in by choice."""
+        rng = random.Random(seed)
+        played = dealt = 0
+        for i in range(hands):
+            rows = [{"seat": n, "name": f"P{n}", "stack": 10000} for n in range(1, seats + 1)]
+            table = TableHand(rows, 1 + i % seats, 50, 100, shuffled_deck(rng))
+            first = None
+            while table.actor:
+                name = table.actor
+                context = now(table, name)
+                move = bots.play(context, table.legal(), profile if name == "P1" else bots.PROFILES["tag"], rng)
+                if name == "P1" and first is None and context["street"] == "preflop":
+                    first = move[0] if context["to_call"] else None
+                table.act(name, *move)
+            if first:
+                dealt += 1
+                played += first in ("call", "raise")
+        return played / dealt
+
+    def test_every_profile_plays_legal_moves_at_every_size_of_table(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            for style, profile in bots.PROFILES.items():
+                for seats in (2, 6, 9):
+                    with self.subTest(style=style, seats=seats):
+                        self.play(profile, seats, hands=25)
+
+    def test_a_loose_profile_plays_more_hands_than_a_tight_one(self):
+        self.assertGreater(self.play(bots.PROFILES["lag"], 6), self.play(bots.PROFILES["rock"], 6))
+
+    def test_a_profile_leans_on_a_typical_player_until_its_sample_grows(self):
+        few = bots.calibrated({"three_bet_did": 2, "three_bet_could": 2}, {})
+        many = bots.calibrated({"three_bet_did": 200, "three_bet_could": 1000}, {})
+
+        typical = bots.PROFILES["tag"]["three_bet"]
+        self.assertLess(abs(few["three_bet"] - typical), abs(100 - typical) / 2)  # 2 of 2 says little
+        self.assertAlmostEqual(many["three_bet"], 100 * (200 + 15 * typical / 100) / 1015, places=1)
+
+    def test_a_profile_opens_by_seat_from_its_own_counts_there(self):
+        profile = bots.calibrated({"rfi_did": 60, "rfi_could": 200}, {"BTN": (45, 50), "UTG": (5, 50)})
+
+        self.assertGreater(profile["rfi"]["BTN"], 70)
+        self.assertLess(profile["rfi"]["EP"], 15)
+        self.assertEqual(bots.opening("UTG+1", profile), profile["rfi"]["EP"])
+        self.assertEqual(bots.opening("BTN", profile, heads_up=True), min(95, profile["rfi"]["BTN"] * 1.8))
+
+
 class GeneratorTests(SimpleTestCase):
     def test_an_all_in_spot_counts_every_card_to_come(self):
         spot = generators.all_in_spot(random.Random(4))
@@ -330,3 +383,190 @@ class GeneratorTests(SimpleTestCase):
         self.assertEqual(list(spot["questions"]), ["mdf"])
         self.assertEqual(spot["context"]["facing"], "bet")
         self.assertEqual(spot["hand"]["hero"], HERO)
+
+
+class ChartTests(SimpleTestCase):
+    def test_each_seat_plays_its_tier_and_moves_up_one_facing_a_raise(self):
+        self.assertEqual(charts.tier_for("UTG+2"), "early")
+        self.assertEqual(charts.tier_for("HJ"), "middle")
+        self.assertEqual(charts.tier_for("HJ", facing_raise=True), "early")
+        # The lecture names no tier above early position's, nor any range from the cutoff on.
+        self.assertIsNone(charts.tier_for("UTG", facing_raise=True))
+        self.assertIsNone(charts.tier_for("CO"))
+
+    def test_a_tier_shows_its_exact_share_beside_the_lectures(self):
+        early, middle = charts.chart_of("early"), charts.chart_of("middle")
+
+        self.assertEqual((early["claimed"], early["share"]), ("about the top 5%", round(50 / 1326, 4)))
+        self.assertEqual((middle["claimed"], middle["share"]), ("about the top 15%", round(106 / 1326, 4)))
+
+    def test_the_chart_raises_its_hands_and_folds_the_rest(self):
+        raised = {"best": ["raise"], "acceptable": ["call"], "in_range": True}
+        self.assertEqual(charts.answer("AJo", "middle", False), raised)
+        self.assertEqual(charts.answer("A9s", "middle", False)["best"], ["fold"])
+        self.assertEqual(charts.answer("AQs", "early", True)["best"], ["raise", "call"])
+        self.assertEqual(charts.answer("AQo", "early", True)["best"], ["fold"])
+
+    def test_a_range_answer_scores_its_overlap_by_combos(self):
+        tens = ranges.parse("TT+")  # 30 combos
+
+        self.assertEqual(charts.overlap_score(tens, tens), 1.0)
+        self.assertEqual(charts.overlap_score(ranges.parse("22-55"), tens), 0.0)
+        self.assertAlmostEqual(charts.overlap_score(ranges.parse("JJ+"), tens), 24 / 30)
+        self.assertEqual(charts.overlap(ranges.parse("99+"), tens), {"both": 30, "extra": 6, "missed": 0})
+        self.assertEqual([charts.range_grade(score) for score in (0.8, 0.5, 0.2)], ["good", "acceptable", "poor"])
+
+    def test_ranges_round_trip_through_notation(self):
+        rng = random.Random(2)
+        for _ in range(200):
+            hands = set(rng.sample(ranges.HANDS, rng.randint(1, 169)))
+            with self.subTest(hands=sorted(hands)):
+                self.assertEqual(ranges.parse(ranges.notation(hands)), hands)
+        self.assertEqual(ranges.notation(ranges.parse("TT+, AQs+, AKo")), "TT+, AQs+, AKo")
+        self.assertEqual(ranges.notation(ranges.HANDS), "any")
+
+
+class FullTableGeneratorTests(SimpleTestCase):
+    def test_an_open_is_folded_to_you_at_a_full_table_in_the_value_zone(self):
+        for seed in range(12):
+            spot = generators.preflop_spot(random.Random(seed), facing=False)
+            context, answer = spot["context"], spot["answer"]
+            with self.subTest(seed=seed):
+                self.assertEqual((context["players_dealt"], context["situation"]), (9, "unopened"))
+                self.assertIn(context["hero_position"], charts.SEATS)
+                self.assertTrue(spot["hand"]["tournament_id"])
+                tier = charts.tier_for(context["hero_position"])
+                self.assertEqual(answer["chart"]["tier"], tier)
+                self.assertEqual(answer["in_range"], answer["hand"] in charts.hands_of(tier))
+                self.assertEqual(ranges.combo_of(context["cards"]), answer["hand"])
+
+    def test_facing_a_raise_moves_up_a_tier(self):
+        spot = generators.preflop_spot(random.Random(3), facing=True)
+        context = spot["context"]
+
+        self.assertIn(context["hero_position"], ("LJ", "HJ"))
+        self.assertEqual(context["situation"], "raised")
+        self.assertEqual(spot["answer"]["chart"]["tier"], "early")
+
+    def test_a_range_read_names_its_line_and_answers_with_the_top_share(self):
+        for seed in range(8):
+            spot = generators.range_read_spot(random.Random(seed))
+            answer = spot["answer"]
+            with self.subTest(seed=seed):
+                self.assertEqual(spot["question"]["kind"], "range")
+                self.assertIn(f"{answer['percent']}%", spot["question"]["prompt"])
+                self.assertEqual(ranges.parse(answer["range"]), ranges.top(answer["percent"]))
+                self.assertIn(spot["context"]["situation"], ("raised", "3bet"))
+
+
+class ChartGradingTests(SimpleTestCase):
+    @staticmethod
+    def scenario(kind, grading, answer):
+        return SimpleNamespace(spec={"question": {"kind": kind}}, grading=grading, answer=answer)
+
+    def test_a_chart_grades_the_move_and_half_credits_a_limp(self):
+        spot = self.scenario("action", "reference", charts.answer("AJo", "middle", False))
+
+        self.assertEqual(sets.grade(spot, {"action": "raise", "amount": 500})["grade"], "good")
+        self.assertEqual(sets.grade(spot, {"action": "call"})["score"], 0.5)
+        self.assertEqual(sets.grade(spot, {"action": "fold"})["grade"], "poor")
+
+    def test_a_range_earns_its_overlap(self):
+        spot = self.scenario("range", "reference", {"range": "TT+"})
+
+        self.assertEqual(sets.grade(spot, {"hand_range": "TT+"}), {"grade": "good", "score": 1.0, "weight": 1.0})
+        self.assertEqual(sets.grade(spot, {"hand_range": "JJ+"})["score"], 0.8)
+        self.assertEqual(sets.grade(spot, {"hand_range": ""})["grade"], "poor")
+
+
+class LibraryTests(SimpleTestCase):
+    def setUp(self):
+        patcher = mock.patch.object(library, "EQUITY_SAMPLES", 3000)  # sampled once per entry: quicker, looser
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def answer_of(self, key):
+        entry = library.build(key)
+        question, answer = entry["question"], entry["answer"]
+        return entry, question["options"][answer["correct"]] if question["kind"] == "choice" else answer["best"]
+
+    def test_every_entry_builds_and_credits_its_lecture(self):
+        for key, (_, source, skills, _, _) in library.ENTRIES.items():
+            with self.subTest(key=key):
+                entry = library.build(key)
+                self.assertTrue(entry["answer"]["explanation"].endswith(f"[{source}]"))
+                self.assertIn(entry["grading"], ("exact", "rule"))
+                self.assertEqual(entry["skills"], skills)
+                self.assertEqual(entry["hand"] is None, bool(entry["setup"]))
+
+    def test_the_lectures_numbers(self):
+        expected = {
+            "pot_odds_share": "17%",
+            "pot_odds_ratio": "10.0 : 1",
+            "mdf_half_pot": "67%",
+            "bluff_two_thirds": "40%",
+            "ev_flush_draw": "−$2",
+            "m_big_blind_ante": "3.0",
+            "set_odds": "7.5 : 1",
+            "rule_of_four": "35%",
+            "akq_king_calls": "67%",
+            "akq_queen_bluffs": "33%",
+            "icm_flip": "$766.67",
+            "satellite_aces": "Fold",
+            "heads_up_calling": "40%",
+        }
+        for key, right in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(self.answer_of(key)[1], right)
+
+    def test_any_two_cards_beat_folding_at_m_2_5(self):
+        entry, best = self.answer_of("push_any_two")
+        context = entry["context"]
+
+        self.assertEqual(best, ["raise"])
+        self.assertEqual((context["hero_position"], context["cards"]), ("SB", ["9d", "6c"]))
+        self.assertGreater(entry["answer"]["ev_bb"]["raise"], entry["answer"]["ev_bb"]["fold"])
+
+    def test_spots_at_a_table_are_dealt_as_the_lecture_tells_them(self):
+        pot_odds = library.build("pot_odds_share")["context"]
+        self.assertEqual((pot_odds["bet"], pot_odds["pot_before"], pot_odds["to_call"]), (10000, 38000, 10000))
+        draw = library.build("ev_flush_draw")
+        self.assertEqual((draw["context"]["to_call"], draw["context"]["pot_if_call"]), (2000, 9000))
+        self.assertIn("flush_draw", draw["context"]["draws"])
+        m = library.build("m_big_blind_ante")["hand"]
+        antes = [event for event in m["events"] if event.get("blind") == "ante"]
+        self.assertEqual([(event["player"], event["amount"]) for event in antes], [("BB", 4000)])
+
+
+class RatingTests(SimpleTestCase):
+    def test_a_win_raises_a_rating_and_narrows_its_range(self):
+        rating, deviation = ratings.update(1500, 350, 1500, 350, 1.0)
+        lost, _ = ratings.update(1500, 350, 1500, 350, 0.0)
+
+        self.assertGreater(rating, 1500)
+        self.assertLess(deviation, 350)
+        self.assertAlmostEqual(rating - 1500, 1500 - lost)
+
+    def test_half_weight_moves_it_half_as_far(self):
+        full, full_deviation = ratings.update(1500, 200, 1600, 100, 1.0)
+        half, half_deviation = ratings.update(1500, 200, 1600, 100, 1.0, weight=0.5)
+
+        self.assertAlmostEqual(half - 1500, (full - 1500) / 2)
+        self.assertGreater(half_deviation, full_deviation)
+        self.assertLess(half_deviation, 200)
+
+    def test_glickmans_example(self):
+        # Glickman's paper: 1500 ± 200 against 1400 ± 30, 1550 ± 100 and 1700 ± 300 as one rating period gives
+        # 1464 ± 151.4; one game at a time it ends close to that.
+        rating, deviation = 1500, 200
+        for other, spread, score in ((1400, 30, 1), (1550, 100, 0), (1700, 300, 0)):
+            rating, deviation = ratings.update(rating, deviation, other, spread, score)
+
+        self.assertAlmostEqual(rating, 1464, delta=6)
+        self.assertAlmostEqual(deviation, 151.4, delta=3)
+
+    def test_time_away_widens_a_range_up_to_where_it_started(self):
+        self.assertEqual(ratings.widened(50, 0), 50)
+        self.assertGreater(ratings.widened(50, 30), 50)
+        self.assertEqual(ratings.widened(50, 10_000), ratings.START_DEVIATION)
+        self.assertEqual(ratings.interval(1500, 100), (1304, 1696))

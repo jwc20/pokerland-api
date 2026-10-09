@@ -73,21 +73,38 @@ point a tracker at your local API, run `pokerland-tracker login --api http://loc
 | `POST /api/auth/registration/`, `login/`, `logout/`, `token/refresh/` | —              | [dj-rest-auth](https://dj-rest-auth.readthedocs.io), with the JWTs in httpOnly cookies. Registering signs you in.                                   |
 | `GET /api/auth/user/`                                                 | cookies        | The signed-in user                                                                                                                                  |
 | `GET /api/users/me/client-token/`                                     | cookies        | The token a tracker signs in with (never cached)                                                                                                    |
-| `GET /api/hands/`                                                     | cookies        | The hands, newest first, 50 per cursor page. Narrow it with `?tag=` (keys from `tags/`, repeatable), `?since=`/`?until=` or `?date=` with `&tz=`, `?stat=` (the hero's chances at a statistic, with `&did=true` or `false`) and `?result=`; sort it with `?sort=oldest`, `biggest_win` or `biggest_loss` (in big blinds); set `?page_size=` up to 50. |
-| `GET /api/hands/<id>/`                                                | cookies        | One hand: its seats, events and board, and the hand in PHH notation                                                                                 |
-| `GET /api/hands/days/?tz=<IANA zone>`                                 | cookies        | Each day's hands and result in big blinds in that time zone, with the current and best streak                                                       |
+| `GET /api/hands/`                                                     | cookies        | The hands, newest first, 50 per cursor page. Narrow it with `?tag=` (keys from `tags/`, repeatable), `?since=`/`?until=` or `?date=` with `&tz=`, `?stat=` (the hero's chances at a statistic, with `&did=true` or `false`), `?result=`, `?review=to_review` or `reviewed`, `?note_tag=` (one of the user's tags), `?leak=` (the hands that broke a preflop discipline check) and `?session=`; sort it with `?sort=oldest`, `biggest_win` or `biggest_loss` (in big blinds); set `?page_size=` up to 50. Each hand has the hero's all-in equity, if the money went in before the river. |
+| `GET /api/hands/<id>/`                                                | cookies        | One hand: its seats, events and board, the hand in PHH notation, and the hero's all-in equity and expected net                                    |
+| `GET, POST /api/hands/<id>/notes/`, `DELETE /api/hands/<id>/notes/<note_id>/` | cookies | What the user wrote on a hand: a note on a street or the whole hand, tags, the review state, and why they made each bet or raise. A `POST` adds a note or changes the one it takes the place of |
+| `GET /api/hands/days/?tz=<IANA zone>`                                 | cookies        | Each day's hands, result in big blinds and sessions in that time zone, with the current and best streak                                           |
 | `GET /api/hands/tags/`                                                | cookies        | Hands counted by position, game, cash-game stakes and format, with won, lost and net big blinds                                                     |
-| `GET /api/stats/`                                                     | cookies        | The hero's statistics (VPIP, PFR, 3-bet, c-bet, ...) as did ÷ could with 95% Wilson intervals, for all hands or by `?group_by=position` or `month`; narrow with `?tag=` (repeatable), `?since=` and `?until=` |
+| `GET /api/review/`                                                    | cookies        | The review queue: how many hands are flagged to review and reviewed, the latest flagged, and the user's tags                                       |
+| `GET /api/stats/`                                                     | cookies        | The hero's statistics (VPIP, PFR, 3-bet, c-bet, ...) as did ÷ could with 95% Wilson intervals, the rake paid and the net before it, and the net adjusted for all-in equity; for all hands or by `?group_by=position`, `month` or `stakes`; narrow with `?tag=` (repeatable), `?since=` and `?until=` |
+| `GET /api/stats/purposes/`                                            | cookies        | The hero's bets and raises by the purpose the user gave them and by street: how often each took the pot at once, was called or was raised, its average size and the folds a bluff of that size needs |
+| `GET /api/leaks/?group=preflop`                                       | cookies        | The preflop discipline checks: open-limps, open and 3-bet sizes, short stacks raising small, premiums limped, short buy-ins and hands per orbit, as times broken ÷ chances with 95% ranges and a trend by month |
+| `GET, PATCH /api/leaks/presets/`                                      | cookies        | The checks' thresholds: the course values, or the user's own; `null` puts one back                                                                  |
+| `GET /api/sessions/`, `GET /api/sessions/<id>/`                       | cookies        | Sessions, the latest first: stretches of play with no gap of over half an hour, with their length, tables, result, all-in adjusted result and biggest pot |
+| `GET /api/sessions/patterns/`                                         | cookies        | Results by hour into the session, time of day, day of the week and tables at once, each with the spread for a 95% range                         |
 | `GET /api/practice/sets/today/?tz=`                                   | cookies        | Today's practice set, made the first time it is asked for: spots coming back for review, decisions from the user's own hands at least a day old and the arithmetic behind them, and generated spots. Answers stay on the server until a spot is answered |
-| `POST /api/practice/sets/`, `GET /api/practice/sets/<id>/`            | cookies        | A set of one mode (`my_hands`, or `generated` with a `skill`), and any of the user's sets with the answers given so far                             |
+| `POST /api/practice/sets/`, `GET /api/practice/sets/<id>/`            | cookies        | A set of one mode (`my_hands`, `generated` with a `skill`, `library`, `their_seat`, or `shared`: hands shared with the user's classes, anonymized), and any of the user's sets with the answers given so far |
 | `POST /api/practice/attempts/`                                        | cookies        | Answers a spot: the grade (never by the card that came), the answer and how it was worked out. A miss comes back the next day                      |
 | `POST /api/practice/reviews/`                                         | cookies        | "Again later": the spot comes back in Leitner boxes, a day away at first and further after each good answer                                         |
 | `GET /api/practice/profile/?tz=`                                      | cookies        | Accuracy by skill with 95% Wilson ranges (a rule of thumb counts half, a reflection not at all), the practice streak and the reviews due             |
-| `GET /api/practice/playbooks/`, `GET /api/practice/playbooks/<id>/`   | cookies        | The playbooks, such as the house starter heads-up playbook; one's rule cards, and the user's coach stage in each rule family                         |
+| `GET, POST /api/practice/playbooks/`                                  | cookies        | The playbooks the user can play by: the house presets, their own and their classes', each at its latest version; and a copy of one of them, theirs to edit |
+| `GET, PUT, DELETE /api/practice/playbooks/<id>/`                      | cookies        | One playbook's rule cards and the user's coach stage in each rule family; for their own, its next version (every card checked, the classes it's assigned to moving to it), or putting it away |
+| `GET /api/practice/playbooks/vocabulary/`                             | cookies        | What a card can say: the tests the rule engine runs, and the families, scopes, reads, actions and exceptions |
 | `GET /api/practice/hands/by-the-book/?playbook=`                      | cookies        | How often the user's last 1,000 hands at least a day old kept each rule, with 95% ranges; with `&rule=`, the decisions it applied to                 |
 | `GET, POST /api/practice/matches/`                                    | cookies        | The user's coached matches, and a new one: heads-up against a bot with a hidden style and leak (`opponent`), with the coach at the user's stage or pinned to one (`coach`) |
 | `GET /api/practice/matches/<id>/`; `POST` its `act/`, `intent/`, `ask/`, `next/`, `resign/`, `departure/` and `reads/` | cookies | A match as the player sees it, the coach saying as much as the stage allows; and each step in it: a move, a stage-2 intent, asking the coach, the next hand, ending the match, why a rule was left, a note on the read card |
 | `GET /api/practice/matches/<id>/debrief/`                             | cookies        | Once the match is over: the debrief, with the bot's style and leak revealed                                                                         |
+| `GET, POST /api/practice/tests/`; `GET` a test, its `next/`; `POST` its `answer/`, `end/`| cookies        | The aptitude test: adaptive spots across every skill, and the report with ratings and their ranges |
+| `GET, POST /api/practice/tables/`; `GET` a table; `POST` its `act/`, `next/`| cookies        | Play it out: a table of two to nine against bots, from a deal or from one of the user's own decisions at least a day old |
+| `GET, POST /api/leagues/`, `POST /api/leagues/join/`                  | cookies        | The user's classes, a new one (they own and coach it, and get an invite code), and joining one by its code |
+| `GET, PATCH /api/leagues/<id>/`                                       | cookies        | A class: its playbooks and anonymized shared hands, and who's in it; a coach also sees the invite code and every member, and can rename it or make a new code |
+| `PATCH, DELETE /api/leagues/<id>/me/`                                 | cookies        | Whether the user shows the coaches their progress (totals only, never hands); or leaving the class |
+| `PATCH, DELETE /api/leagues/<id>/members/<id>/`                       | cookies        | For a coach: making someone a coach or a member, or taking them out of the class |
+| `POST /api/leagues/<id>/assignments/`, `DELETE` one                   | cookies        | A coach assigns one of their playbooks; anyone shares one of their hands (an anonymized E2 share); whoever put it there, or a coach, withdraws it |
+| `GET /api/leagues/<id>/progress/`, `GET` a member's                   | cookies        | For a coach: each sharing member's practice accuracy and playbook stages; one member's adds how their own hands kept each rule |
 | `GET /api/tracker/status/`                                            | cookies        | What the user's trackers have uploaded: the last upload, files, hands, platforms and versions                                                       |
 | `GET /api/tracker/me/`, `GET /api/tracker/config/`                    | client token   | The token's user, and the settings a tracker fetches at startup and every few hours                                                                 |
 | `PUT /api/tracker/streams/<id>/`                                      | client token   | Registers a hand-history file, or tells a tracker how much of it the server has                                                                     |
@@ -120,8 +137,12 @@ flowchart LR
 - To require a newer tracker, raise `TRACKER_MIN_CLIENT_VERSION`. Older trackers then get 426 and show "update
   required", and the Windows tracker updates itself.
 - `uv run python manage.py practice_generate [--per-skill 50] [--skill push_fold]` fills the pool of generated
-  practice spots that every user shares. A push-or-fold spot samples its equity and takes about a second, so run it
-  after deploying rather than leave the spots to be made in a request.
+  practice spots that every user shares. A push-or-fold spot samples its equity, so run it after deploying rather
+  than leave the spots to be made in a request.
+- `uv run python manage.py rebuild_sessions [usernames]` builds the users' sessions afresh from their hands. Storing
+  hands keeps them up to date; this is for hands stored before sessions were, or after changing the gap.
+- `uv run python manage.py equity_benchmark` times the all-in equity the parser works out, by kind of all-in. Run it
+  on Lambda (`zappa manage dev equity_benchmark`) to see what a reparse costs there.
 
 ## Configuration
 
@@ -168,8 +189,10 @@ database next to it and drop it afterwards. `docker compose down` stops PostgreS
 ```
 pokerlandapi/   settings, root URLs, cookie JWT auth, registration, schema extensions
 users/          the client tokens trackers sign in with
-tracker/        uploads (streams, chunks, raw storage, async parsing) and the parser in tracker/parsing/
-hands/          parsed hands and each player's facts, and the filters and stats behind the web app
+tracker/        uploads (streams, chunks, raw storage, async parsing) and the parser in tracker/parsing/, with
+                all-in equity in tracker/parsing/equity.py
+hands/          parsed hands, each player's facts, the user's notes and sessions, and the filters, stats and leak
+                checks behind the web app
 practice/       practice sets and their grading, the playbook's rules, and coached matches: PokerKit tables,
                 bots with leaks, the coach and the read card
 scripts/        deploy.py

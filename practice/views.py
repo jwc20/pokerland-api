@@ -1,4 +1,5 @@
-from django.db.models import Q
+from django.db.models import Count
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -9,9 +10,9 @@ from rest_framework.views import APIView
 
 from hands.filters import PLAYED
 from hands.models import Hand
-from practice import book, debrief, matches, sets
-from practice.models import Attempt, CoachedMatch, Playbook, Review, RuleProgress, ScenarioSet
-from practice.playbook import FAMILIES
+from practice import aptitude, book, coaching, debrief, matches, play, sets, shared, theirs
+from practice.models import Attempt, CoachedMatch, Playbook, PracticeTable, Review, ScenarioSet
+from practice.playbook import ACTIONS, CONDITIONS, FAMILIES, READS, PlaybookError
 from practice.serializers import (
     ActRequestSerializer,
     AttemptRequestSerializer,
@@ -26,12 +27,23 @@ from practice.serializers import (
     MatchSummarySerializer,
     NewSetSerializer,
     NoteRequestSerializer,
+    PlaybookCopySerializer,
     PlaybookDetailSerializer,
     PlaybookSerializer,
+    PlaybookVersionSerializer,
+    PlaybookVocabularySerializer,
+    PlayTableSerializer,
+    PlayTableSummarySerializer,
     PracticeProfileSerializer,
     PracticeSetSerializer,
     ReviewRequestSerializer,
     ReviewSerializer,
+    TableMoveSerializer,
+    TableStartSerializer,
+    TestAnswerSerializer,
+    TestReportSerializer,
+    TestStateSerializer,
+    TestSummarySerializer,
     TimeZoneQuerySerializer,
 )
 
@@ -70,7 +82,8 @@ class TodaySetView(APIView):
 
 
 class SetListView(APIView):
-    """A new set of one mode: decisions from the user's own hands, or generated spots for one skill."""
+    """A new set of one mode: decisions from the user's own hands, generated spots for one skill, the library, the
+    user's opponents' decisions from their seat, or decisions in hands shared with their classes."""
 
     @extend_schema(request=NewSetSerializer, responses={status.HTTP_201_CREATED: PracticeSetSerializer})
     def post(self, request):
@@ -78,7 +91,12 @@ class SetListView(APIView):
         query.is_valid(raise_exception=True)
         data = query.validated_data
         day = timezone.localdate(timezone=data["tz"])
-        practice_set = sets.mode_set(request.user, data["kind"], day, data.get("skill", ""))
+        if data["kind"] == "their_seat":
+            practice_set = theirs.their_set(request.user, day)
+        elif data["kind"] == "shared":
+            practice_set = shared.shared_set(request.user, day)
+        else:
+            practice_set = sets.mode_set(request.user, data["kind"], day, data.get("skill", ""))
         return Response(PracticeSetSerializer(set_data(practice_set)).data, status=status.HTTP_201_CREATED)
 
 
@@ -112,7 +130,7 @@ class ReviewView(APIView):
         query = ReviewRequestSerializer(data=request.data)
         query.is_valid(raise_exception=True)
         scenario = query.validated_data["scenario"]
-        if scenario.owner_id not in (None, request.user.pk):
+        if not shared.open_to(request.user, scenario):
             return Response({"scenario": ["Not found."]}, status=status.HTTP_400_BAD_REQUEST)
         sets.again_later(request.user, scenario, timezone.localdate(timezone=query.validated_data["tz"]))
         review = Review.objects.get(user=request.user, scenario=scenario)
@@ -137,44 +155,90 @@ class ProfileView(APIView):
         return Response(PracticeProfileSerializer(profile).data)
 
 
-def visible_playbooks(user):
-    """The house presets, saved as they are first used, and the user's own playbooks."""
-    sets.house_playbook()
-    return Playbook.objects.filter(Q(owner=None) | Q(owner=user)).order_by("owner", "key", "-version")
-
-
-def family_stages(user, playbook):
-    """The user's stage in each of the playbook's rule families; stage 1 until a match moves it."""
-    progress = {row.family: row for row in RuleProgress.objects.filter(user=user, playbook_key=playbook.key)}
-    used = {rule["family"] for rule in playbook.rules}
-    return [
-        {
-            "family": family,
-            "label": label,
-            "stage": progress[family].stage if family in progress else 1,
-            "recent": progress[family].recent if family in progress else [],
-        }
-        for family, label in FAMILIES.items()
-        if family in used
-    ]
-
-
 class PlaybookListView(APIView):
-    """The playbooks the signed-in user can play by: the house presets and their own."""
+    """The playbooks the signed-in user can play by: the house presets, their own and their classes'; and a new one of
+    their own, a copy of one of those, to edit."""
 
     @extend_schema(responses=PlaybookSerializer(many=True))
     def get(self, request):
-        return Response(PlaybookSerializer(visible_playbooks(request.user), many=True).data)
+        playbooks = coaching.visible(request.user)
+        return Response(PlaybookSerializer(playbooks, many=True, context={"request": request}).data)
+
+    @extend_schema(request=PlaybookCopySerializer, responses={status.HTTP_201_CREATED: PlaybookDetailSerializer})
+    def post(self, request):
+        query = PlaybookCopySerializer(data=request.data, context={"request": request})
+        query.is_valid(raise_exception=True)
+        playbook = coaching.copy(request.user, query.validated_data["copy_of"], query.validated_data["name"])
+        return Response(playbook_detail(request, playbook), status=status.HTTP_201_CREATED)
+
+
+def playbook_detail(request, playbook):
+    playbook.families = coaching.stages(request.user, playbook)
+    return PlaybookDetailSerializer(playbook, context={"request": request}).data
 
 
 class PlaybookDetailView(APIView):
-    """A playbook's rule cards, and the signed-in user's stage in each of its rule families."""
+    """A playbook's rule cards, and the signed-in user's stage in each of its rule families; for one of their own, its
+    next version, or putting it away."""
+
+    def playbook(self, request, pk, own=False):
+        playbook = get_object_or_404(Playbook, pk=pk)
+        allowed = playbook.owner_id == request.user.pk if own else coaching.can_read(request.user, playbook)
+        if not allowed:
+            raise Http404
+        return playbook
 
     @extend_schema(responses=PlaybookDetailSerializer)
     def get(self, request, pk):
-        playbook = get_object_or_404(visible_playbooks(request.user), pk=pk)
-        playbook.families = family_stages(request.user, playbook)
-        return Response(PlaybookDetailSerializer(playbook).data)
+        return Response(playbook_detail(request, self.playbook(request, pk)))
+
+    @extend_schema(request=PlaybookVersionSerializer, responses=PlaybookDetailSerializer)
+    def put(self, request, pk):
+        playbook = self.playbook(request, pk, own=True)
+        query = PlaybookVersionSerializer(data=request.data)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        try:
+            version = coaching.save_version(playbook, data["name"], data["description"], data["rules"])
+        except PlaybookError as error:
+            raise ValidationError({"rules": error.errors}) from None
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)}) from None
+        return Response(playbook_detail(request, version))
+
+    @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
+    def delete(self, request, pk):
+        coaching.archive(self.playbook(request, pk, own=True))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PlaybookVocabularyView(APIView):
+    """What a coach's cards can say: every test the rule engine runs, with its kind of value, and the families,
+    scopes, reads, actions and exceptions it knows."""
+
+    @extend_schema(responses=PlaybookVocabularySerializer)
+    def get(self, request):
+        conditions = []
+        for key, (kind, allowed, label) in CONDITIONS.items():
+            entry = {"key": key, "kind": kind, "label": label}
+            if kind == "choice":
+                entry["choices"] = allowed
+            elif kind == "number":
+                entry["low"], entry["high"] = allowed
+            conditions.append(entry)
+        data = {
+            "conditions": conditions,
+            "families": [{"key": key, "label": label} for key, label in FAMILIES.items()],
+            "scopes": [{"key": "anyone", "label": "Anyone"}, {"key": "heads_up", "label": "Heads-up"}]
+            + [{"key": key, "label": label} for key, label in READS.items()],
+            "reads": [{"key": key, "label": label} for key, label in READS.items()],
+            "actions": list(ACTIONS),
+            "unless": [
+                {"key": "multiway", "label": "More than one opponent"},
+                {"key": "short", "label": "10 bb or less"},
+            ],
+        }
+        return Response(PlaybookVocabularySerializer(data).data)
 
 
 class BookView(APIView):
@@ -335,3 +399,159 @@ class MatchDebriefView(MatchView):
         if not match.finished:
             raise ValidationError({"detail": "The match isn't over."})
         return Response(DebriefSerializer(debrief.debrief(match)).data)
+
+
+# The aptitude test -------------------------------------------------------------------------------------------------
+
+
+def test_state(test):
+    """A test as it goes, with the spot it asks now, chosen if need be."""
+    item = aptitude.next_spot(test)
+    test.refresh_from_db()
+    return {
+        "id": test.pk,
+        "planned": test.planned,
+        "answered": aptitude.answered(test),
+        "created": test.created,
+        "finished": test.finished,
+        "spot": {"position": item.position, "scenario": item.scenario} if item else None,
+    }
+
+
+class TestListView(APIView):
+    """The signed-in user's aptitude tests, the latest first; and a new one: 24 graded spots, about 12 minutes."""
+
+    @extend_schema(responses=TestSummarySerializer(many=True))
+    def get(self, request):
+        tests = (
+            ScenarioSet.objects.filter(user=request.user, kind="test")
+            .annotate(answered=Count("attempts"))
+            .order_by("-created")[:20]
+        )
+        return Response(TestSummarySerializer(tests, many=True).data)
+
+    @extend_schema(request=TimeZoneQuerySerializer, responses={status.HTTP_201_CREATED: TestStateSerializer})
+    def post(self, request):
+        query = TimeZoneQuerySerializer(data=request.data)
+        query.is_valid(raise_exception=True)
+        test = aptitude.start(request.user, timezone.localdate(timezone=query.validated_data["tz"]))
+        return Response(TestStateSerializer(test_state(test)).data, status=status.HTTP_201_CREATED)
+
+
+class TestView(APIView):
+    def test(self, request, pk):
+        return get_object_or_404(ScenarioSet, pk=pk, user=request.user, kind="test")
+
+
+class TestNextView(TestView):
+    """The spot a test asks now, without its answer; none once the test is over."""
+
+    @extend_schema(responses=TestStateSerializer)
+    def get(self, request, pk):
+        return Response(TestStateSerializer(test_state(self.test(request, pk))).data)
+
+
+class TestAnswerView(TestView):
+    """Answers the spot a test is asking. Nothing about the answer comes back until the test is over: only the next
+    spot."""
+
+    @extend_schema(request=TestAnswerSerializer, responses=TestStateSerializer)
+    def post(self, request, pk):
+        test = self.test(request, pk)
+        query = TestAnswerSerializer(data=request.data)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        try:
+            aptitude.answer(test, data["scenario"], data, timezone.localdate(timezone=data["tz"]))
+        except aptitude.TestError as error:
+            raise ValidationError({"scenario": [str(error)]}) from None
+        return Response(TestStateSerializer(test_state(test)).data)
+
+
+class TestEndView(TestView):
+    """Ends a test early: the report covers the spots answered."""
+
+    @extend_schema(request=None, responses=TestStateSerializer)
+    def post(self, request, pk):
+        test = self.test(request, pk)
+        aptitude.give_up(test)
+        return Response(TestStateSerializer(test_state(test)).data)
+
+
+class TestDetailView(TestView):
+    """A test's report, once it is over: accuracy and rating by skill, every spot with its answer, strengths and gaps
+    in words, and what to practise next."""
+
+    @extend_schema(responses=TestReportSerializer)
+    def get(self, request, pk):
+        test = self.test(request, pk)
+        if not test.finished:
+            raise ValidationError({"detail": "The test isn't over."})
+        return Response(TestReportSerializer(aptitude.report(test)).data)
+
+
+# Play it out -------------------------------------------------------------------------------------------------------
+
+
+class TableListView(APIView):
+    """The signed-in user's Play it out tables, the latest first; and a new one, from a deal or from a spot."""
+
+    @extend_schema(responses=PlayTableSummarySerializer(many=True))
+    def get(self, request):
+        return Response(PlayTableSummarySerializer(play.recent(request.user), many=True).data)
+
+    @extend_schema(request=TableStartSerializer, responses={status.HTTP_201_CREATED: PlayTableSerializer})
+    def post(self, request):
+        query = TableStartSerializer(data=request.data, context={"request": request})
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        try:
+            if data.get("scenario"):
+                table = play.start_spot(request.user, data["scenario"])
+            else:
+                table = play.start_deal(request.user, data["seats"], data["opponents"], data["stack_bb"])
+        except play.PlayError as error:
+            raise ValidationError({"detail": str(error)}) from None
+        return Response(PlayTableSerializer(play.state(table)).data, status=status.HTTP_201_CREATED)
+
+
+class TableView(APIView):
+    def table(self, request, pk):
+        return get_object_or_404(PracticeTable, pk=pk, user=request.user, kind="play")
+
+    def run(self, table, step):
+        try:
+            step()
+        except play.PlayError as error:
+            raise ValidationError({"detail": str(error)}) from None
+        table.refresh_from_db()
+        return Response(PlayTableSerializer(play.state(table)).data)
+
+
+class TableDetailView(TableView):
+    """A Play it out table as it stands."""
+
+    @extend_schema(responses=PlayTableSerializer)
+    def get(self, request, pk):
+        return Response(PlayTableSerializer(play.state(self.table(request, pk))).data)
+
+
+class TableActView(TableView):
+    """Your move; the bots answer, until it is your turn again or the hand is over."""
+
+    @extend_schema(request=TableMoveSerializer, responses=PlayTableSerializer)
+    def post(self, request, pk):
+        table = self.table(request, pk)
+        query = TableMoveSerializer(data=request.data)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        return self.run(table, lambda: play.act(table, data["action"], data.get("amount")))
+
+
+class TableNextView(TableView):
+    """Deals the next hand once the last is over; a busted stack buys in again."""
+
+    @extend_schema(request=None, responses=PlayTableSerializer)
+    def post(self, request, pk):
+        table = self.table(request, pk)
+        return self.run(table, lambda: play.next_hand(table))

@@ -9,7 +9,7 @@ from practice.sets import GENERATED, generated_scenario
 class Command(BaseCommand):
     help = (
         "Fill the pool of generated practice spots, shared by every user, so a set never waits on one. Push-or-fold "
-        "spots sample their equity and take about a second each; the rest are quick."
+        "spots sample their equity, the slowest of them at a few hundredths of a second each locally."
     )
 
     def add_arguments(self, parser):

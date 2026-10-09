@@ -37,6 +37,7 @@ from pokerkit import (
 )
 
 from tracker.parsing.facts import hand_facts
+from tracker.parsing.tournaments import tournament_facts
 
 SITE = "pokerstars"
 GAMES = {"Hold'em No Limit": "NT", "Omaha Pot Limit": "PO"}  # PokerStars' names, PokerKit's variant codes
@@ -262,6 +263,8 @@ def extract(text):
         "players": players,
         "events": replay.events,
         "phh": hh.dumps(),
+        # A tournament's buy-in and level, and who finished it or won a bounty in this hand (FND-8).
+        "tournament": tournament_facts(text) if hh.event else None,
     }
     hand["facts"] = hand_facts(hand)
     return hand

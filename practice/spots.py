@@ -11,30 +11,15 @@ A hand is a dict with the replay's `players`, `events` and `button_seat`, its `b
 imports Django, so it runs on fixture files, on stored hands and at a practice table alike.
 """
 
-from tracker.parsing.facts import draws, made_hand
+from tracker.parsing.facts import SHOWDOWN_VALUE, STRONG, STRONG_DRAWS, draws, made_hand
 
 MOVES = ("fold", "check", "call", "bet", "raise")
 POSTFLOP = ("flop", "turn", "river")
 
-# What the playbook's rules call a hand after the flop, from its made hand and draws (tracker.parsing.facts):
-# a good hand, one that beats bluffs and little else, a draw with eight or more outs, or nothing.
+# What the playbook's rules call a hand after the flop, from its made hand and draws (tracker.parsing.facts's
+# STRONG, SHOWDOWN_VALUE and STRONG_DRAWS): a good hand, one that beats bluffs and little else, a draw with eight or
+# more outs, or nothing.
 HAND_CLASSES = ("nothing", "draw", "showdown_value", "strong")
-STRONG = {
-    "overpair",
-    "top_pair_top_kicker",
-    "top_pair",
-    "two_pair",
-    "set",
-    "trips",
-    "three_of_a_kind",
-    "straight",
-    "flush",
-    "full_house",
-    "four_of_a_kind",
-    "straight_flush",
-}
-SHOWDOWN_VALUE = {"second_pair", "bottom_pair", "pocket_pair", "underpair", "one_pair"}  # one_pair: Omaha's
-STRONG_DRAWS = {"nut_flush_draw", "flush_draw", "open_ended", "double_gutshot"}
 # The made hands in words, as the coach and the read card say them.
 HAND_NAMES = {
     "high_card": "nothing",

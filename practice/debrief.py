@@ -14,16 +14,16 @@ import datetime
 
 from django.db import transaction
 from django.utils import timezone
-from pokerkit import Card
 
 from hands.stats import proportion
-from practice import bots, coach, generators, reads
+from practice import bots, coach, reads
 from practice.matches import HERO, LEVELS, VILLAIN, read_card, table_hand
 from practice.models import RuleProgress, Scenario
 from practice.playbook import FAMILIES
 from practice.rules import check
 from practice.sets import BOXES, again_later, legal_of
 from practice.spots import HAND_NAMES
+from tracker.parsing.equity import all_in
 
 COOLER_BB = 20  # a stack's worth lost, by the book, makes a cooler
 
@@ -151,11 +151,15 @@ def luck_and_play(match, hands, decisions):
         if equity is None:
             expected += net
         else:
-            share, invested, pot = equity
-            fair = (share * pot - invested) / bb
+            fair = (equity["expected"] - equity["invested"]) / bb
             expected += fair
             swings.append(
-                {"hand": number, "equity": round(share, 3), "expected_bb": round(fair, 2), "net_bb": round(net, 2)}
+                {
+                    "hand": number,
+                    "equity": round(equity["equity"], 3),
+                    "expected_bb": round(fair, 2),
+                    "net_bb": round(net, 2),
+                }
             )
         mine = by_hand.get(number, [])
         if _net(row) / row.big_blind <= -COOLER_BB and mine and all(d.followed is not False for d in mine):
@@ -170,35 +174,10 @@ def luck_and_play(match, hands, decisions):
 
 
 def all_in_equity(row):
-    """The hero's share of the pot when the money went in, if a player was all-in before the river with both
-    hands shown: (equity, chips each put in, the pot). None for any other hand.
-
-    The equity counts every card to come after the flop, and samples them before it.
-    """
-    replay = row.replay
-    cards = {player["name"]: player["cards"] for player in replay["players"]}
-    if len(cards.get(VILLAIN) or []) != 2:
-        return None
-    put_in = {HERO: 0, VILLAIN: 0}
-    board, settled, all_in = [], None, False
-    for event in replay["events"]:
-        if event["type"] == "street" and "board" in event:
-            board = event["board"]
-        if event["type"] in ("post", "call", "bet", "raise"):
-            put_in[event["player"]] += event.get("amount", 0)
-            all_in = all_in or bool(event.get("all_in"))
-        elif event["type"] == "return":
-            put_in[event["player"]] -= event["amount"]
-        if event["type"] in ("fold", "check", "call", "bet", "raise"):
-            settled = list(board)  # the board when the last move was made
-    if not all_in or settled is None or len(settled) >= 5:
-        return None
-    called = min(put_in.values())  # the excess of the bigger stack went back
-    if settled:
-        share = generators.exact_equity(cards[HERO], cards[VILLAIN], settled)
-    else:
-        share = generators.sampled_equity(cards[HERO], [frozenset(Card.parse("".join(cards[VILLAIN])))])[0]
-    return share, called, 2 * called
+    """The hero's equity, expected chips and chips put in when the money went in before the river, from the hand's
+    replay, which holds both players' cards (tracker.parsing.equity.all_in); None for any other hand."""
+    hand = {**row.replay, "game": "Hold'em No Limit", "site": "practice", "hand_id": row.pk}
+    return (all_in(hand) or {}).get(HERO)
 
 
 def what_moved(match, decisions):

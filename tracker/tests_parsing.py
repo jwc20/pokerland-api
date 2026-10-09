@@ -395,6 +395,26 @@ class FactsTests(SimpleTestCase):
         )
         self.assertEqual(chances(alice)["cbet_flop"], (1, 1))
 
+    def test_raise_sizes_before_the_flop(self):
+        squeeze = hand_in("steals_and_squeezes.txt", "262300000002")
+        iso = hand_in("side_pots.txt", "262289607882")
+
+        bob, alice = player_facts(squeeze, "Bob"), player_facts(squeeze, "Alice")
+        sizes = ("open_bb", "open_limpers", "three_bet_x", "three_bet_callers", "first_raise_all_in")
+
+        self.assertEqual([bob[size] for size in sizes], [3.0, 0, None, None, False])
+        self.assertEqual([alice[size] for size in sizes], [None, None, 4.667, 1, False])  # to 2,800 over 600, one caller
+        # A raise over three limpers is an open, and the re-raise that moved in is a 3-bet all-in.
+        self.assertEqual([player_facts(iso, "Alice")[size] for size in sizes], [6.0, 3, None, None, False])
+        self.assertEqual(player_facts(iso, "Grace")["first_raise_all_in"], True)
+
+    def test_no_raise_no_sizes(self):
+        hand = hand_in("steals_and_squeezes.txt", "262300000001")
+
+        erin = player_facts(hand, "Erin")  # folded the small blind to the steal
+
+        self.assertEqual((erin["open_bb"], erin["three_bet_x"], erin["first_raise_all_in"]), (None, None, None))
+
     def test_continuation_bets_and_the_answers_to_them(self):
         hand = hand_in("play_money.txt", "262289806991")
 

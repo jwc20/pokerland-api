@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "tracker",
     "hands",
     "practice",
+    "leagues",
 ]
 
 MIDDLEWARE = [
@@ -106,6 +107,8 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Rates for the views that opt in with ScopedRateThrottle: the public share links, which need no sign-in.
+    "DEFAULT_THROTTLE_RATES": {"public_share": "60/minute"},
 }
 
 # OpenAPI schema, served at /api/schema/ outside prod. pokerland-client generates
@@ -125,10 +128,18 @@ SPECTACULAR_SETTINGS = {
         "HandTagGroupEnum": "hands.filters.TAG_GROUPS",
         "PracticeActionEnum": "practice.serializers.ACTIONS",
         "PracticeSkillEnum": "practice.serializers.SKILL_CHOICES",
-        "GeneratedSkillEnum": "practice.serializers.GENERATED_SKILLS",
         "MatchOpponentEnum": "practice.models.CoachedMatch.OPPONENTS",
         "MatchCoachEnum": "practice.models.CoachedMatch.COACH",
+        "TableOpponentsEnum": "practice.play.OPPONENTS",
+        "AssignmentKindEnum": "leagues.models.Assignment.KINDS",
+        "LeagueRoleEnum": "leagues.models.Membership.ROLES",
         "NoteAuthorEnum": "practice.serializers.AUTHORS",
+        "HandNoteKindEnum": "hands.models.HandNote.Kind",
+        "NotePurposeEnum": "hands.notes.PURPOSES",
+        "ReviewStateEnum": "hands.notes.REVIEW_STATES",
+        "BetSizeEnum": "hands.stats.BET_SIZE_KEYS",
+        "OpponentLabelEnum": "hands.models.Opponent.Label",
+        "StatGroupingEnum": "hands.stats.STAT_GROUPINGS",
     },
 }
 

@@ -1,4 +1,4 @@
-"""What the web app narrows a user's hands to: tags, days in their time zone, decisions and results."""
+"""What the web app narrows a user's hands to: tags, days in their time zone, decisions, results and notes."""
 
 import datetime
 import functools
@@ -109,8 +109,14 @@ def stat_filter(stat, did=None):
 
 
 def narrow(hands, filters):
-    """`hands` narrowed by the validated filters of hands.serializers.HandFilterSerializer and its subclasses."""
+    """`hands` narrowed by the validated filters of hands.serializers.HandFilterSerializer and its subclasses.
+
+    A spot, a spec, an opponent or a tournament comes as a Q the serializer built (`where`), since building it
+    takes the user's own spots, opponents and tournaments.
+    """
     tz = filters.get("tz", UTC)
+    for condition in filters.get("where", []):
+        hands = hands.filter(condition)
     for key in filters.get("tag", []):
         hands = hands.filter(tag_filter(key))
     if "since" in filters:
@@ -124,4 +130,11 @@ def narrow(hands, filters):
         hands = hands.filter(stat_filter(filters["stat"], filters.get("did")))
     if "result" in filters:
         hands = hands.filter(RESULTS[filters["result"]])
+    # A hand has one review state and each tag once, so neither join repeats a hand.
+    if "review" in filters:
+        hands = hands.filter(notes__kind="review", notes__value=filters["review"])
+    if "note_tag" in filters:
+        hands = hands.filter(notes__kind="tag", notes__value=filters["note_tag"])
+    if "session" in filters:
+        hands = hands.filter(session_id=filters["session"])
     return hands

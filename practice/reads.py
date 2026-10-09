@@ -67,7 +67,7 @@ def counts(seen, hero, villain):
         totals[key][1] += 1
 
     for hand in seen:
-        facts = {row["name"]: row for row in hand_facts(_extracted(hand["data"]))["players"]}
+        facts = {row["name"]: row for row in hand_facts(_extracted(hand["data"]), with_equity=False)["players"]}
         them = facts.get(villain)
         if not them:
             continue
@@ -154,7 +154,7 @@ def label(seen, villain):
     vpip = [0, 0]
     aggression = [0, 0]
     for hand in seen:
-        row = next(row for row in hand_facts(_extracted(hand["data"]))["players"] if row["name"] == villain)
+        row = next(row for row in hand_facts(_extracted(hand["data"]), with_equity=False)["players"] if row["name"] == villain)
         vpip[0] += row["vpip_did"]
         vpip[1] += row["vpip_could"]
         aggressive = row["postflop_bets"] + row["postflop_raises"]
