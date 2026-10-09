@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,6 +22,15 @@ from leagues.serializers import (
     MembershipUpdateSerializer,
     RoleSerializer,
 )
+
+
+class ClassView(APIView):
+    """A classes endpoint: 404 for everyone while classes aren't open (settings.CLASSES_ENABLED)."""
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not settings.CLASSES_ENABLED:
+            raise NotFound("Classes aren't open yet.")
 
 
 def member_of(request, pk, coach=False):
@@ -52,7 +62,7 @@ def detail(request, member):
     return LeagueDetailSerializer(league, context=context).data
 
 
-class LeagueListView(APIView):
+class LeagueListView(ClassView):
     """The classes the signed-in user is in; and a new one, which they own and coach."""
 
     @extend_schema(responses=LeagueSerializer(many=True))
@@ -71,7 +81,7 @@ class LeagueListView(APIView):
         return Response(detail(request, member_of(request, league.pk)), status=status.HTTP_201_CREATED)
 
 
-class JoinView(APIView):
+class JoinView(ClassView):
     """Joins a class by its invite code, as a member. Joining one you're in already changes nothing."""
 
     @extend_schema(request=JoinSerializer, responses=LeagueDetailSerializer)
@@ -85,7 +95,7 @@ class JoinView(APIView):
         return Response(detail(request, member_of(request, league.pk)))
 
 
-class LeagueDetailView(APIView):
+class LeagueDetailView(ClassView):
     """A class: its playbooks and hands, and who's in it. A coach can rename it or give it a new invite code."""
 
     @extend_schema(responses=LeagueDetailSerializer)
@@ -107,7 +117,7 @@ class LeagueDetailView(APIView):
         return Response(detail(request, member))
 
 
-class MyMembershipView(APIView):
+class MyMembershipView(ClassView):
     """The signed-in user in a class: whether they show the coaches their progress; or leaving it."""
 
     @extend_schema(request=MembershipUpdateSerializer, responses=LeagueDetailSerializer)
@@ -128,7 +138,7 @@ class MyMembershipView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class MemberView(APIView):
+class MemberView(ClassView):
     """A coach makes someone in their class a coach or a member, or takes them out of it."""
 
     def member(self, request, pk, member_pk):
@@ -156,7 +166,7 @@ class MemberView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AssignmentListView(APIView):
+class AssignmentListView(ClassView):
     """Puts something before a class: a coach assigns one of their playbooks; anyone shares one of their hands."""
 
     @extend_schema(request=AssignmentRequestSerializer, responses={status.HTTP_201_CREATED: AssignmentSerializer})
@@ -176,7 +186,7 @@ class AssignmentListView(APIView):
         return Response(AssignmentSerializer(assignment, context=context).data, status=status.HTTP_201_CREATED)
 
 
-class AssignmentDetailView(APIView):
+class AssignmentDetailView(ClassView):
     """Withdraws something from a class: by whoever put it there, or a coach. A withdrawn hand leaves future sets."""
 
     @extend_schema(responses={status.HTTP_204_NO_CONTENT: None})
@@ -190,7 +200,7 @@ class AssignmentDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ProgressView(APIView):
+class ProgressView(ClassView):
     """For a class's coaches: each member who shares their progress, with their practice accuracy and their stage in
     each assigned playbook's rule families. Totals only, never their hands."""
 
@@ -200,7 +210,7 @@ class ProgressView(APIView):
         return Response(MemberProgressSerializer(classes.progress(member.league), many=True).data)
 
 
-class MemberProgressView(APIView):
+class MemberProgressView(ClassView):
     """For a class's coaches: one sharing member's progress, with how their own hands kept each assigned playbook's
     rules (by the book), which reads up to a thousand of their hands."""
 

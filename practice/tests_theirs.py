@@ -49,6 +49,22 @@ class TheirMoveTests(TheirSeatTestCase):
         self.assertIn("action", answer["they_did"])
         self.assertEqual(answer["result"]["hand"], scenario.hand_id)
 
+    def test_after_answering_you_see_what_they_did_and_how_it_ended_for_them(self):
+        data = self.their_set()
+        spot = next(spot for spot in data["spots"] if spot["scenario"]["topic"] == "their_action")
+        scenario = Scenario.objects.get(pk=spot["scenario"]["id"])
+
+        outcome = self.answer(spot, data["id"], **self.right_answer(scenario))["outcome"]
+        replay, player = outcome["hand"], scenario.answer["player"]
+        made = replay["events"][outcome["decision"]]
+
+        self.assertEqual(replay["hero"], player)  # still from their seat, their cards dealt face up
+        self.assertEqual((made["player"], made["type"]), (player, scenario.answer["they_did"]["action"]))
+        after = len(scenario.hand.replay["events"]) - scenario.step
+        self.assertEqual(len(replay["events"]) - outcome["decision"], after)
+        net = {row["name"]: row["net"] for row in scenario.hand.replay["players"]}[player]
+        self.assertEqual({row["name"]: row["net"] for row in replay["players"]}[player], net)
+
     def test_spots_are_made_once(self):
         first = {spot["scenario"]["id"] for spot in self.their_set()["spots"]}
         second = {spot["scenario"]["id"] for spot in self.their_set()["spots"]}

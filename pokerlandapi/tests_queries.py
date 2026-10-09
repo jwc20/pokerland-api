@@ -3,6 +3,7 @@ again; a query per row (N+1) shows as a difference."""
 
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient, APITestCase
 
@@ -76,6 +77,7 @@ class HandListTests(QueryCountTestCase):
         self.assertFlat("/api/shares/", lambda: [self.post("/api/shares/", {"hand": hand.pk}) for hand in hands])
 
 
+@override_settings(CLASSES_ENABLED=True)  # a playbook's classes are part of the list
 class PracticeListTests(QueryCountTestCase):
     def test_playbooks_of_your_own_assigned_to_classes(self):
         house = sets.house_playbook()
@@ -101,6 +103,19 @@ class PracticeListTests(QueryCountTestCase):
             self.post("/api/practice/tests/", {"tz": "UTC"}) for _ in range(2)
         ])
 
+    def test_a_set_of_your_own_hands_and_how_each_ended(self):
+        practice_set = self.post("/api/practice/sets/", {"kind": "my_hands", "tz": "UTC"})
+        self.assertGreaterEqual(len(practice_set["spots"]), 4)
+
+        def answer():
+            for spot in practice_set["spots"][:4]:
+                body = {"scenario": spot["scenario"]["id"], "set": practice_set["id"], "action": "fold", "tz": "UTC"}
+                if spot["scenario"]["spec"]["legal"]["can_check"]:
+                    body["action"] = "check"
+                self.post("/api/practice/attempts/", body)
+
+        self.assertFlat(f"/api/practice/sets/{practice_set['id']}/", answer)
+
     def test_a_set_and_its_answers(self):
         practice_set = self.post("/api/practice/sets/", {"kind": "library", "tz": "UTC"})
 
@@ -119,6 +134,7 @@ class PracticeListTests(QueryCountTestCase):
         self.assertFlat(f"/api/practice/sets/{practice_set['id']}/", answer)
 
 
+@override_settings(CLASSES_ENABLED=True)
 class LeagueListTests(QueryCountTestCase):
     def member(self, name, league):
         user = User.objects.create_user(name)

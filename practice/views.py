@@ -49,7 +49,9 @@ from practice.serializers import (
 def set_data(practice_set):
     """A set with its spots in order, each with the last answer given to it in the set."""
     attempts = {}
-    for attempt in Attempt.objects.filter(set=practice_set).select_related("scenario").order_by("created"):
+    # The hand too: an answered spot from one of the user's hands shows how it ended (AttemptResultSerializer.outcome).
+    attempts_in_set = Attempt.objects.filter(set=practice_set).select_related("scenario__hand").order_by("created")
+    for attempt in attempts_in_set:
         attempts[attempt.scenario_id] = attempt
     spots = [
         {

@@ -3,17 +3,19 @@
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework.test import APIClient, APITestCase
 
 from hands.models import Hand, HandShare
 from hands.tests import add_stream
-from leagues.models import Assignment, Membership
+from leagues.models import Assignment, League, Membership
 from practice.models import Scenario
 from practice.tests import NOW
 
 User = get_user_model()
 
 
+@override_settings(CLASSES_ENABLED=True)  # not open yet; these test them as they will be
 class ClassTestCase(APITestCase):
     def setUp(self):
         patcher = mock.patch("django.utils.timezone.now", return_value=NOW)
@@ -292,3 +294,30 @@ class ProgressTests(ClassTestCase):
 
     def test_members_cant_see_progress(self):
         self.assertEqual(self.as_user(self.alice).get(self.url("progress/")).status_code, 403)
+
+
+class ClosedTests(APITestCase):
+    """Classes aren't open yet (settings.CLASSES_ENABLED off, the default): their API answers nothing."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        self.client.force_authenticate(self.user)
+
+    def test_every_classes_endpoint_is_not_found(self):
+        for method, url in (
+            ("get", "/api/leagues/"),
+            ("post", "/api/leagues/"),
+            ("post", "/api/leagues/join/"),
+            ("get", "/api/leagues/1/"),
+            ("post", "/api/leagues/1/assignments/"),
+            ("get", "/api/leagues/1/progress/"),
+        ):
+            with self.subTest(method=method, url=url):
+                response = getattr(self.client, method)(url, {"name": "Tuesday", "code": "ABCD2345"}, format="json")
+                self.assertEqual(response.status_code, 404)
+        self.assertFalse(League.objects.exists())
+
+    def test_a_shared_practice_set_is_refused(self):
+        response = self.client.post("/api/practice/sets/", {"kind": "shared", "tz": "UTC"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("kind", response.data)

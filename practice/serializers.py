@@ -1,3 +1,4 @@
+from django.conf import settings
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -8,7 +9,7 @@ from practice import charts, coaching, play, shared
 from practice.models import Attempt, CoachedMatch, Playbook, PracticeTable, Scenario, ScenarioSet
 from practice.playbook import FAMILIES, READS
 from practice.reads import ONE_OFF, TAGS
-from practice.sets import SKILLS
+from practice.sets import SKILLS, hand_data, outcome_of
 
 ACTIONS = ["fold", "check", "call", "bet", "raise"]
 SKILL_CHOICES = list(SKILLS)
@@ -266,10 +267,29 @@ class OverlapSerializer(serializers.Serializer):
     missed = serializers.IntegerField(help_text="In the stated range only.")
 
 
+class OutcomeSerializer(serializers.Serializer):
+    """Once a spot from one of your hands is answered: the hand from the spot's seat, to the end."""
+
+    hand = TableHandSerializer(
+        help_text="The spot's events up to its decision, then every one after it: the move made at the table, the "
+        "cards to come, the showdown, and each player's result."
+    )
+    decision = serializers.IntegerField(
+        help_text="The replay step the spot asked at: the table as it stood. The next step is the move made then."
+    )
+
+
+# Spots from the user's own hands, which they may see to the end once answered: not a hand shared with them.
+OUTCOME_SOURCES = ("own_hand", "their_seat")
+
+
 class AttemptResultSerializer(serializers.ModelSerializer):
     """A graded answer, with the spot's answer. A reflection is not graded: its grade is "ungraded"."""
 
     answer = FeedbackSerializer(source="scenario.answer")
+    outcome = serializers.SerializerMethodField(
+        help_text="A spot from one of your hands, My hands' or their seat's: what was played there and how it ended."
+    )
     grading = serializers.ChoiceField(source="scenario.grading", choices=list(Scenario.GRADINGS))
     overlap = serializers.SerializerMethodField(help_text="A range answer: how it met the stated range.")
 
@@ -292,9 +312,18 @@ class AttemptResultSerializer(serializers.ModelSerializer):
             "rule",
             "grading",
             "answer",
+            "outcome",
             "created",
         )
         read_only_fields = fields
+
+    @extend_schema_field(OutcomeSerializer(allow_null=True))
+    def get_outcome(self, attempt):
+        scenario = attempt.scenario
+        if scenario.source not in OUTCOME_SOURCES or not scenario.hand_id or scenario.step is None:
+            return None
+        hero = (scenario.spec.get("hand") or {}).get("hero") or scenario.hand.hero
+        return OutcomeSerializer(outcome_of(hand_data(scenario.hand), scenario.step, hero)).data
 
     @extend_schema_field(OverlapSerializer(allow_null=True))
     def get_overlap(self, attempt):
@@ -404,6 +433,8 @@ class NewSetSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["kind"] == "generated" and "skill" not in attrs:
             raise serializers.ValidationError({"skill": "A generated set needs its skill."})
+        if attrs["kind"] == "shared" and not settings.CLASSES_ENABLED:
+            raise serializers.ValidationError({"kind": "Classes aren't open yet: no shared hands to practise."})
         return attrs
 
 

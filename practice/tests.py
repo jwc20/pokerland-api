@@ -255,6 +255,35 @@ class ModeSetTests(PracticeTestCase):
 
         self.assertEqual({spot["scenario"]["topic"] for spot in response.data["spots"]}, {"action"})
 
+    def test_after_answering_one_of_your_hands_you_see_what_you_did_and_how_it_ended(self):
+        data = self.client.post("/api/practice/sets/", {"kind": "my_hands", "tz": "UTC"}, format="json").data
+        spot = data["spots"][0]
+        scenario = Scenario.objects.get(pk=spot["scenario"]["id"])
+        hand, stored = scenario.hand, scenario.hand.replay["events"]
+
+        self.assertNotIn("outcome", spot["scenario"])  # nothing of the rest of the hand before the answer
+        outcome = self.answer(spot, data["id"])["outcome"]
+        replay = outcome["hand"]
+        asked = spot["scenario"]["spec"]["hand"]
+
+        # The spot's own table up to the decision, then the move made there and everything after it.
+        self.assertEqual(outcome["decision"], len(asked["events"]))
+        self.assertEqual(replay["events"][: outcome["decision"]], asked["events"])
+        self.assertEqual(replay["events"][outcome["decision"] :], stored[scenario.step :])
+        made = replay["events"][outcome["decision"]]
+        self.assertEqual((made["player"], made["type"]), (hand.hero, scenario.answer["you_did"]["action"]))
+        results = {player["name"]: player["net"] for player in replay["players"]}
+        self.assertEqual(results[hand.hero], hand.hero_net)
+        self.assertEqual(replay["hero"], hand.hero)
+        # And again with the set, for a spot answered earlier.
+        again = self.client.get(f"/api/practice/sets/{data['id']}/").data["spots"][0]["attempt"]
+        self.assertEqual(again["outcome"], outcome)
+
+    def test_a_generated_spot_has_no_hand_to_end(self):
+        data = self.client.post("/api/practice/sets/", {"kind": "generated", "skill": "arithmetic"}, format="json").data
+
+        self.assertIsNone(self.answer(data["spots"][0], data["id"])["outcome"])
+
     def test_a_generated_set_needs_its_skill(self):
         response = self.client.post("/api/practice/sets/", {"kind": "generated"}, format="json")
 

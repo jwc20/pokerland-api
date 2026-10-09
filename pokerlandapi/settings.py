@@ -155,6 +155,10 @@ REST_AUTH = {
     "SESSION_LOGIN": False,
 }
 
+# Classes (the leagues app, and practising hands shared with a class) aren't open yet: off unless CLASSES_ENABLED is
+# "true". Off, /api/leagues/ answers 404 and a "shared" practice set is refused; the code and tables stay as they are.
+CLASSES_ENABLED = os.environ.get("CLASSES_ENABLED", "").lower() == "true"
+
 # Tracker uploads (see pokerland-trackers/protocol/PROTOCOL.md). Chunks are
 # gzipped hand-history bytes; the compressed limit keeps a request within
 # Lambda's 6 MB payload once API Gateway has base64-encoded the body.

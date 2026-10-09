@@ -116,6 +116,23 @@ def table_spec(data, step, labels):
     return {"hand": hand, "labels": labels, "revealed": {}}
 
 
+def outcome_of(data, step, hero):
+    """The whole hand from the seat a spot was asked from, for once it is answered: what was played there, and how the
+    hand ended. Up to the decision, the events are the spot's own; then every one after it, from the move made at the
+    table to the showdown's cards and who collected. Each player has their result.
+
+    {"hand": the hand as TableHandSerializer has it, "decision": the replay step the spot asked at}.
+    """
+    spot = table_spec({**data, "hero": hero}, step, "names")["hand"]
+    results = {player["name"]: player for player in data["players"]}
+    players = [
+        {**player, "won": results[player["name"]].get("won", 0), "net": results[player["name"]].get("net", 0)}
+        for player in spot["players"]
+    ]
+    events = [*spot["events"], *data["events"][step:]]
+    return {"hand": {**spot, "players": players, "events": events}, "decision": len(spot["events"])}
+
+
 def dealt_to(events, hero, cards):
     """The events with `hero`'s cards the only ones dealt face up: the replay shows a seat's cards from its deal."""
     kept = [event for event in events if event["type"] != "deal" or event.get("player") == hero]
