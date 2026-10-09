@@ -47,10 +47,11 @@ class TableHand:
     """A hand at a practice table, rebuilt from its deck and the moves made so far.
 
     `seats` lists the players dealt in as {"seat", "name", "stack"}. `moves` are [name, action, amount], the
-    amount being the total a bet or raise makes the player's bet on the street, and None otherwise.
+    amount being the total a bet or raise makes the player's bet on the street, and None otherwise. `ante` is what
+    each player antes, or {name: ante} for antes only some post, such as a big-blind ante.
     """
 
-    def __init__(self, seats, button_seat, small_blind, big_blind, deck, moves=()):
+    def __init__(self, seats, button_seat, small_blind, big_blind, deck, moves=(), ante=0):
         by_seat = {seat["seat"]: seat for seat in seats}
         # PokerKit's order: the first to act after the flop first, the button last.
         self.seats = [by_seat[number] for number in postflop_order(seats, button_seat)]
@@ -58,7 +59,9 @@ class TableHand:
         self.button_seat = button_seat
         self.small_blind = small_blind
         self.big_blind = big_blind
-        self.game = NoLimitTexasHoldem(AUTOMATIONS, True, 0, (small_blind, big_blind), big_blind)
+        self.ante = ante
+        antes = {self.names.index(name): chips for name, chips in ante.items()} if isinstance(ante, dict) else ante
+        self.game = NoLimitTexasHoldem(AUTOMATIONS, True, antes, (small_blind, big_blind), big_blind)
         self.state = self.game([seat["stack"] for seat in self.seats], len(self.seats))
         self.state.deck_cards = deque(Card.parse(deck))
         while self.state.can_deal_hole():
@@ -141,7 +144,7 @@ class TableHand:
             "max_seats": len(self.seats),
             "small_blind": self.small_blind,
             "big_blind": self.big_blind,
-            "ante": 0,
+            "ante": sum(self.ante.values()) if isinstance(self.ante, dict) else self.ante,
             "rake": 0,
             "total_pot": sum(player["won"] for player in data["players"]),
         }

@@ -257,3 +257,201 @@ STARTER = {
 }
 
 HOUSE = {STARTER["key"]: STARTER}
+
+
+# Playbooks a coach writes (CM-4) ---------------------------------------------------------------------------------
+
+STREETS = ["preflop", "flop", "turn", "river"]
+SEATS = ["SB", "BB", "UTG", "UTG+1", "UTG+2", "LJ", "HJ", "CO", "BTN"]
+ACTIONS = ["fold", "check", "call", "bet", "raise"]
+# What a card's test, or a branch's, can ask of a decision (practice.spots' context and practice.rules.derived):
+# each a choice of values, a yes or no, a number in a range, or a line of moves such as "check_call".
+CONDITIONS = {
+    "street": ("choice", STREETS, "The street"),
+    "heads_up": ("bool", None, "Dealt in heads-up"),
+    "multiway": ("bool", None, "More than one opponent still in"),
+    "players": ("number", (2, 10), "Players still in"),
+    "hero_position": ("choice", SEATS, "Your seat"),
+    "position": ("choice", ["in", "out"], "In position after the flop, or out of it"),
+    "preflop": ("choice", ["raised", "called_raise", "limped"], "Your part before the flop"),
+    "previous": ("line", None, "Your moves on the street before, such as check_call"),
+    "situation": ("choice", ["unopened", "limped", "raised", "3bet", "4bet+"], "What you face before the flop"),
+    "facing": ("choice", ["none", "bet", "raise"], "What you face"),
+    "facing_all_in": ("bool", None, "Facing an all-in"),
+    "facing_bb": ("number", (0, 10000), "The bet you face, in big blinds"),
+    "facing_pot": ("number", (0, 20), "The bet you face, as a share of the pot"),
+    "bets_faced": ("number", (0, 10), "Bets faced after the flop before this one"),
+    "big_bet": ("bool", None, "Facing a bet of three quarters of the pot or more"),
+    "room_to_shove": ("bool", None, "Room for them to move all-in over a raise"),
+    "hand_class": ("choice", ["nothing", "draw", "showdown_value", "strong"], "Your hand's class"),
+    "pair_or_better": ("bool", None, "A pair or better"),
+    "has_ace": ("bool", None, "An ace in your hand"),
+    "equity_needed": ("number", (0, 1), "The equity a call needs"),
+    "price_margin": ("number", (-1, 1), "Your draw's chance, less the equity a call needs"),
+    "effective_bb": ("number", (0, 10000), "The effective stack, in big blinds"),
+    "spr": ("number", (0, 1000), "The stack-to-pot ratio"),
+    "pot_bb": ("number", (0, 10000), "The pot, in big blinds"),
+}
+SCOPES = ["anyone", "heads_up", *READS]
+UNLESS = ["multiway", "short"]  # practice.rules.EXCEPTIONS
+MAX_CARDS = 40
+MAX_BRANCHES = 6
+LIMITS = {"rule": 160, "why": 400, "exceptions": 300, "source": 40, "name": 100, "description": 1000}
+
+
+class PlaybookError(ValueError):
+    """A playbook's cards don't hold together; `errors` says where, card by card."""
+
+    def __init__(self, errors):
+        super().__init__("; ".join(errors))
+        self.errors = errors
+
+
+def clean_rules(rules):
+    """A coach's cards, checked and tidied for the rule engine: numbered in order, with only the fields it reads.
+    PlaybookError lists every problem found."""
+    errors = []
+    if not isinstance(rules, list) or not rules:
+        raise PlaybookError(["A playbook needs at least one card."])
+    if len(rules) > MAX_CARDS:
+        errors.append(f"A playbook holds at most {MAX_CARDS} cards.")
+    cleaned, ids = [], set()
+    for number, card in enumerate(rules[:MAX_CARDS], start=1):
+        found = []
+        tidy = _card(card, number, found) if isinstance(card, dict) else None
+        if tidy is None and not found:
+            found.append("isn't a card")
+        if tidy and tidy["id"] in ids:
+            found.append(f"its id {tidy['id']!r} is another card's")
+        errors += [f"Card {number}: {problem}." for problem in found]
+        if tidy:
+            ids.add(tidy["id"])
+            cleaned.append(tidy)
+    if errors:
+        raise PlaybookError(errors)
+    return cleaned
+
+
+def _card(card, number, found):
+    tidy = {"number": number}
+    card_id = card.get("id")
+    if not isinstance(card_id, str) or not (2 <= len(card_id) <= 40) or not card_id.replace("_", "").isalnum():
+        found.append("its id must be 2 to 40 letters, digits or underscores")
+    tidy["id"] = str(card_id).lower() if card_id else ""
+    for field in ("family", "kind", "scope"):
+        allowed = {"family": list(FAMILIES), "kind": ["action", "sizing"], "scope": SCOPES}[field]
+        if card.get(field) not in allowed:
+            found.append(f"its {field} must be one of {', '.join(allowed)}")
+        tidy[field] = card.get(field)
+    for field in ("rule", "why", "exceptions"):
+        text = card.get(field, "")
+        required = field != "exceptions"
+        if not isinstance(text, str) or len(text) > LIMITS[field] or (required and not text.strip()):
+            found.append(f"its {field} must be {'' if required else 'empty or '}text of up to {LIMITS[field]} characters")
+        elif text.strip():
+            tidy[field] = text.strip()
+    source = card.get("source", [])
+    if not isinstance(source, list) or len(source) > 8 or not all(
+        isinstance(item, str) and 0 < len(item) <= LIMITS["source"] for item in source
+    ):
+        found.append("its sources must be up to 8 short citations")
+    tidy["source"] = [item.strip() for item in source if isinstance(item, str)] if isinstance(source, list) else []
+    for flag in ("simplification", "adjustment"):
+        if card.get(flag):
+            tidy[flag] = True
+    if tidy.get("adjustment"):
+        if card.get("read") not in READS:
+            found.append(f"an adjustment needs the read that unlocks it: one of {', '.join(READS)}")
+        tidy["read"] = card.get("read")
+    if card.get("basis") not in (None, "exact"):
+        found.append('its basis, if any, must be "exact"')
+    elif card.get("basis"):
+        tidy["basis"] = "exact"
+    unless = card.get("unless", [])
+    if not isinstance(unless, list) or any(item not in UNLESS for item in unless):
+        found.append(f"its exceptions to test must be among {', '.join(UNLESS)}")
+    elif unless:
+        tidy["unless"] = list(dict.fromkeys(unless))
+    tidy["when"] = _conditions(card.get("when"), "its test", found, required=True)
+    tidy["then"] = _branches(card.get("then"), tidy.get("kind"), found)
+    return tidy
+
+
+def _conditions(test, where, found, required=False):
+    """A test: {condition: value}, each condition one of CONDITIONS with a value of its kind."""
+    if not isinstance(test, dict) or (required and not test):
+        found.append(f"{where} needs at least one condition" if required else f"{where} must be conditions")
+        return {}
+    tidy = {}
+    for key, wanted in test.items():
+        if key not in CONDITIONS:
+            found.append(f"{where} can't test {key!r}")
+            continue
+        kind, allowed, _ = CONDITIONS[key]
+        if kind == "bool" and isinstance(wanted, bool):
+            tidy[key] = wanted
+        elif kind == "choice" and (wanted in allowed or (
+            isinstance(wanted, list) and wanted and all(item in allowed for item in wanted)
+        )):
+            tidy[key] = wanted
+        elif kind == "line" and isinstance(wanted, str) and wanted.replace("_", "").isalpha():
+            tidy[key] = wanted
+        elif kind == "number" and _number(wanted, allowed):
+            tidy[key] = wanted
+        else:
+            found.append(f"{where} has a value for {key!r} that doesn't fit it")
+    return tidy
+
+
+def _number(wanted, bounds):
+    """A number within bounds, or {"min", "max"} with at least one of them, each within bounds, min below max."""
+    low, high = bounds
+    if isinstance(wanted, bool):
+        return False
+    if isinstance(wanted, int | float):
+        return low <= wanted <= high
+    if not isinstance(wanted, dict) or not wanted or set(wanted) - {"min", "max"}:
+        return False
+    values = list(wanted.values())
+    if not all(isinstance(value, int | float) and not isinstance(value, bool) for value in values):
+        return False
+    return all(low <= value <= high for value in values) and wanted.get("min", low) <= wanted.get("max", high)
+
+
+def _branches(then, kind, found):
+    """What a card says to do: one branch, or a list tried in order, each with its own test (`if`) but the last."""
+    branches = then if isinstance(then, list) else [then]
+    if not branches or len(branches) > MAX_BRANCHES or not all(isinstance(branch, dict) for branch in branches):
+        found.append(f"its move must be one branch or a list of up to {MAX_BRANCHES}")
+        return []
+    tidy = []
+    for number, branch in enumerate(branches, start=1):
+        where = f"branch {number}" if len(branches) > 1 else "its move"
+        action = branch.get("action")
+        if action not in ACTIONS:
+            found.append(f"{where} needs an action: one of {', '.join(ACTIONS)}")
+            continue
+        clean = {"action": action}
+        if "if" in branch:
+            clean["if"] = _conditions(branch["if"], f"{where}'s test", found)
+        if "size" in branch:
+            if action != "bet" or not _number(branch["size"], (0.05, 3)):
+                found.append(f"{where}'s size must be a bet's share of the pot, from 0.05 to 3")
+            clean["size"] = branch["size"]
+        if "to_bb" in branch:
+            if action != "raise" or not _number(branch["to_bb"], (1, 50)):
+                found.append(f"{where}'s raise must make the bet 1 to 50 big blinds")
+            clean["to_bb"] = branch["to_bb"]
+        accepts = branch.get("accepts")
+        if accepts is not None:
+            if not isinstance(accepts, list) or action not in accepts or any(item not in ACTIONS for item in accepts):
+                found.append(f"{where}'s moves that keep it must be actions, its own among them")
+            clean["accepts"] = accepts
+        if branch.get("verdict") not in (None, "clear", "close"):
+            found.append(f'{where}\'s verdict, if any, must be "clear" or "close"')
+        elif branch.get("verdict"):
+            clean["verdict"] = branch["verdict"]
+        tidy.append(clean)
+    if kind == "sizing" and any(branch["action"] != "bet" or "size" not in branch for branch in tidy):
+        found.append("a sizing card says how much to bet: every branch a bet with its size")
+    return tidy if isinstance(then, list) else (tidy[0] if tidy else {})

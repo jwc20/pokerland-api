@@ -121,6 +121,52 @@ def _token(token):
     raise ValueError(f"Not a range: {token!r}")
 
 
+def notation(hands):
+    """Hands as short range notation, as `parse` reads it: runs of pairs and of kickers under one top card,
+    "TT+, A2s+, KTo+, 76s". pokerland-client's formatRange writes the same."""
+    chosen = set(hands)
+    if len(chosen) == len(HANDS):
+        return "any"
+    order = RANKS[::-1]
+    parts = []
+    for run in _runs([r for r in order if r + r in chosen]):
+        top_rank, bottom = run[0], run[-1]
+        if len(run) == 1:
+            parts.append(top_rank * 2)
+        elif top_rank == "A":
+            parts.append(f"{bottom}{bottom}+")
+        else:
+            parts.append(f"{top_rank}{top_rank}-{bottom}{bottom}")
+    for high in order:
+        below = order[order.index(high) + 1 :]
+        for kind in "so":
+            for run in _runs([low for low in below if high + low + kind in chosen]):
+                top_rank, bottom = run[0], run[-1]
+                if len(run) == 1:
+                    parts.append(f"{high}{top_rank}{kind}")
+                elif top_rank == below[0]:
+                    parts.append(f"{high}{bottom}{kind}+")
+                else:
+                    parts.append(f"{high}{top_rank}{kind}-{high}{bottom}{kind}")
+    return ", ".join(parts)
+
+
+def _runs(ranks):
+    """Ranks given high first, in runs of consecutive ones."""
+    found = []
+    for card_rank in ranks:
+        if found and rank(found[-1][-1]) == rank(card_rank) + 1:
+            found[-1].append(card_rank)
+        else:
+            found.append([card_rank])
+    return found
+
+
+def combos_of(hands):
+    """How many combos a set of hands holds."""
+    return sum(combo_count(hand) for hand in hands)
+
+
 def top(percent):
     """The hands from the top of RANKING until their combos make `percent`% of all 1,326: a hand counts once the
     hands before it make less than that share."""

@@ -1,15 +1,17 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from hands import ranges
 from hands.filters import UTC
 from hands.serializers import HandEventSerializer, HandPlayerSerializer, TimeZoneField
-from practice.models import Attempt, CoachedMatch, Playbook, Scenario, ScenarioSet
+from practice import charts, coaching, play, shared
+from practice.models import Attempt, CoachedMatch, Playbook, PracticeTable, Scenario, ScenarioSet
 from practice.playbook import FAMILIES, READS
 from practice.reads import ONE_OFF, TAGS
-from practice.sets import GENERATED, SKILLS
+from practice.sets import SKILLS
 
 ACTIONS = ["fold", "check", "call", "bet", "raise"]
 SKILL_CHOICES = list(SKILLS)
-GENERATED_SKILLS = list(GENERATED)
 VERDICTS = ["clear", "close", "your_call"]
 BASES = ["exact", "rule", "adjustment", "none"]
 REASONS = ["value", "bluff", "draw", "protect", "bluff_catch", "price", "trap", "give_up", "cant_say"]
@@ -61,7 +63,10 @@ class AmountsField(serializers.DictField):
 
 
 class QuestionSerializer(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=["action", "choice"], help_text="What to do, or a choice of four.")
+    kind = serializers.ChoiceField(
+        choices=["action", "choice", "range"],
+        help_text="What to do, a choice of up to four, or a range of hands picked on the grid.",
+    )
     prompt = serializers.CharField()
     options = serializers.ListField(child=serializers.CharField(), required=False)
     unit = serializers.ChoiceField(choices=["percent", "ratio", "number"], required=False)
@@ -72,7 +77,10 @@ class QuestionSerializer(serializers.Serializer):
 class ScenarioSpecSerializer(serializers.Serializer):
     """What the client draws and asks; the answer stays on the server until an attempt."""
 
-    hand = TableHandSerializer()
+    hand = TableHandSerializer(allow_null=True, help_text="Null for a spot with no table, such as a toy game.")
+    setup = serializers.CharField(required=False, help_text="A spot with no table: its setup, in words.")
+    title = serializers.CharField(required=False, help_text="A library spot: the example's name.")
+    credit = serializers.CharField(required=False, help_text="A library spot: the lectures it comes from.")
     labels = serializers.ChoiceField(
         choices=["names", "positions"], help_text="Seats show names in the user's own hands, positions otherwise."
     )
@@ -144,6 +152,14 @@ class RuleCardSerializer(serializers.Serializer):
     adjustment = serializers.BooleanField(required=False)
     read = serializers.ChoiceField(choices=list(READS), required=False)
     source = serializers.ListField(child=serializers.CharField())
+    when = serializers.DictField(
+        child=serializers.JSONField(), required=False, help_text="The test the card runs: {condition: value}."
+    )
+    unless = serializers.ListField(child=serializers.CharField(), required=False, help_text="Spots it leaves out.")
+    then = serializers.JSONField(
+        required=False, help_text="What it says to do: a branch, or a list of branches each with its own test."
+    )
+    basis = serializers.CharField(required=False, help_text='"exact" for a card that works the price out.')
 
 
 class NumbersSerializer(serializers.Serializer):
@@ -171,9 +187,34 @@ class NumbersSerializer(serializers.Serializer):
 
 
 class HandResultSerializer(serializers.Serializer):
-    hand = serializers.IntegerField(help_text="The hand's id, for its replay.")
+    hand = serializers.IntegerField(
+        allow_null=True, help_text="The hand's id, for its replay; null for a hand shared with your class."
+    )
     step = serializers.IntegerField(help_text="The event the decision is.")
     net_bb = serializers.FloatField(help_text="How the hand went for you, in big blinds.")
+
+
+class ChartSerializer(serializers.Serializer):
+    """The published chart a preflop spot is graded by, and the tier of it the spot is in (practice.charts)."""
+
+    key = serializers.CharField()
+    label = serializers.CharField()
+    applies_to = serializers.CharField(help_text="The stacks and table the chart is for.")
+    source = serializers.CharField()
+    tier = serializers.CharField()
+    range = serializers.CharField(help_text="The tier's hands, in range notation.")
+    tier_label = serializers.CharField()
+    claimed = serializers.CharField(help_text="What the lecture calls its size, rounded for teaching.")
+    tier_source = serializers.CharField()
+    share = serializers.FloatField(help_text="Its exact share of all 1,326 combos.")
+
+
+class AnchorSerializer(serializers.Serializer):
+    """The course's memory aid nearest a stated share of hands [MIT 4], and how much of the answer it holds."""
+
+    percent = serializers.IntegerField()
+    range = serializers.CharField()
+    overlap = serializers.FloatField(help_text="Combos in both ÷ combos in either.")
 
 
 class FeedbackSerializer(serializers.Serializer):
@@ -185,16 +226,44 @@ class FeedbackSerializer(serializers.Serializer):
     explanation = serializers.CharField(required=False)
     amounts = AmountsField()
     best = serializers.ListField(child=serializers.ChoiceField(choices=ACTIONS), required=False)
+    acceptable = serializers.ListField(
+        child=serializers.ChoiceField(choices=ACTIONS),
+        required=False,
+        help_text="A chart's spot: moves worth half credit, such as limping a hand the chart raises.",
+    )
     ev_bb = serializers.DictField(child=serializers.FloatField(), required=False, help_text="Each option's EV in bb.")
     equity = serializers.FloatField(required=False)
     equity_needed = serializers.FloatField(required=False)
-    range = serializers.CharField(required=False, help_text="The stated range the answer assumes.")
+    range = serializers.CharField(
+        required=False, help_text="The stated range the answer assumes, or a range question's answer."
+    )
+    chart = ChartSerializer(required=False, help_text="A preflop spot: the chart and tier it is graded by.")
+    hand = serializers.CharField(required=False, help_text="A preflop spot: your hand, as the chart names it.")
+    in_range = serializers.BooleanField(required=False, help_text="A preflop spot: whether the chart plays your hand.")
+    share = serializers.FloatField(required=False, help_text="A range question: the range's share of all combos.")
+    percent = serializers.IntegerField(required=False, help_text="A range question: the share stated with the spot.")
+    anchor = AnchorSerializer(required=False)
     assumptions = serializers.CharField(required=False)
     advice = AdviceSerializer(required=False, allow_null=True)
     rule = RuleCardSerializer(required=False, allow_null=True)
     you_did = MoveSerializer(required=False, help_text="Your own hand: what you did at the time.")
+    player = serializers.CharField(required=False, help_text="Their seat: the player whose seat it was.")
+    they_did = MoveSerializer(required=False, help_text="Their seat: what they did at the time.")
+    their_cards = serializers.ListField(
+        child=serializers.CharField(), required=False, help_text="Their range: the cards they showed."
+    )
+    their_hand = serializers.CharField(required=False, help_text="Their range: those cards as a hand, 97s.")
+    in_stated = serializers.BooleanField(required=False, help_text="Their range: their hand was in the stated range.")
     result = HandResultSerializer(required=False)
     context = NumbersSerializer(required=False)
+
+
+class OverlapSerializer(serializers.Serializer):
+    """How a range answer met the stated range, in combos."""
+
+    both = serializers.IntegerField(help_text="In your range and the stated one.")
+    extra = serializers.IntegerField(help_text="In your range only.")
+    missed = serializers.IntegerField(help_text="In the stated range only.")
 
 
 class AttemptResultSerializer(serializers.ModelSerializer):
@@ -202,6 +271,7 @@ class AttemptResultSerializer(serializers.ModelSerializer):
 
     answer = FeedbackSerializer(source="scenario.answer")
     grading = serializers.ChoiceField(source="scenario.grading", choices=list(Scenario.GRADINGS))
+    overlap = serializers.SerializerMethodField(help_text="A range answer: how it met the stated range.")
 
     class Meta:
         model = Attempt
@@ -209,6 +279,8 @@ class AttemptResultSerializer(serializers.ModelSerializer):
             "id",
             "scenario",
             "choice",
+            "hand_range",
+            "overlap",
             "action",
             "amount",
             "reason",
@@ -224,11 +296,33 @@ class AttemptResultSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(OverlapSerializer(allow_null=True))
+    def get_overlap(self, attempt):
+        if attempt.scenario.spec["question"]["kind"] != "range":
+            return None
+        stated = ranges.parse(attempt.scenario.answer["range"])
+        return charts.overlap(ranges.parse(attempt.hand_range), stated)
 
-class AttemptRequestSerializer(serializers.Serializer):
-    scenario = serializers.PrimaryKeyRelatedField(queryset=Scenario.objects.all())
-    set = serializers.PrimaryKeyRelatedField(queryset=ScenarioSet.objects.all(), required=False, allow_null=True)
+
+class RangeField(serializers.CharField):
+    """Hands in range notation, as hands.ranges reads it: "TT+, AQs+, AKo"."""
+
+    def to_internal_value(self, data):
+        notation = super().to_internal_value(data)
+        try:
+            ranges.parse(notation)
+        except ValueError as error:
+            raise serializers.ValidationError(str(error)) from None
+        return notation
+
+
+class AnswerSerializer(serializers.Serializer):
+    """An answer to a spot: a choice, a range of hands, or a move."""
+
     choice = serializers.IntegerField(required=False, min_value=0, max_value=3)
+    hand_range = RangeField(
+        required=False, allow_blank=True, max_length=2000, help_text="A range question: the hands, in range notation."
+    )
     action = serializers.ChoiceField(choices=ACTIONS, required=False)
     amount = serializers.IntegerField(required=False, min_value=1, help_text="A bet or raise: the bet it makes.")
     reason = serializers.ChoiceField(choices=REASONS, required=False)
@@ -236,20 +330,34 @@ class AttemptRequestSerializer(serializers.Serializer):
     time_taken = serializers.FloatField(required=False, min_value=0)
     tz = TimeZoneField(required=False, default=UTC, help_text="The time zone the user's days are counted in.")
 
-    def validate(self, attrs):
-        user = self.context["request"].user
-        scenario, practice_set = attrs["scenario"], attrs.get("set")
-        if scenario.owner_id not in (None, user.pk):
-            raise serializers.ValidationError({"scenario": "Not found."})
-        if practice_set and (practice_set.user_id != user.pk or not practice_set.items.filter(scenario=scenario)):
-            raise serializers.ValidationError({"set": "Not one of your sets with this spot."})
+    @staticmethod
+    def check(scenario, attrs):
+        """The answer the spot's question asks for, and a bet or raise's amount."""
         kind = scenario.spec["question"]["kind"]
         if kind == "choice" and "choice" not in attrs:
             raise serializers.ValidationError({"choice": "This spot asks for a choice."})
+        if kind == "range" and "hand_range" not in attrs:
+            raise serializers.ValidationError({"hand_range": "This spot asks for a range of hands."})
         if kind == "action" and "action" not in attrs:
             raise serializers.ValidationError({"action": "This spot asks what you do."})
         if attrs.get("action") in ("bet", "raise") and "amount" not in attrs:
             raise serializers.ValidationError({"amount": "A bet or raise needs its amount."})
+
+
+class AttemptRequestSerializer(AnswerSerializer):
+    scenario = serializers.PrimaryKeyRelatedField(queryset=Scenario.objects.all())
+    set = serializers.PrimaryKeyRelatedField(queryset=ScenarioSet.objects.all(), required=False, allow_null=True)
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        scenario, practice_set = attrs["scenario"], attrs.get("set")
+        if not shared.open_to(user, scenario):
+            raise serializers.ValidationError({"scenario": "Not found."})
+        if practice_set and (practice_set.user_id != user.pk or not practice_set.items.filter(scenario=scenario)):
+            raise serializers.ValidationError({"set": "Not one of your sets with this spot."})
+        if practice_set and practice_set.kind == "test":
+            raise serializers.ValidationError({"set": "A test's answers go to the test."})
+        self.check(scenario, attrs)
         return attrs
 
 
@@ -283,14 +391,30 @@ class PracticeSetSerializer(serializers.ModelSerializer):
 
 
 class NewSetSerializer(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=["my_hands", "generated"])
-    skill = serializers.ChoiceField(choices=GENERATED_SKILLS, required=False, help_text="A generated set's skill.")
+    kind = serializers.ChoiceField(
+        choices=["my_hands", "generated", "library", "their_seat", "shared"],
+        help_text=(
+            "Your own decisions, generated spots for one skill, worked examples from the lectures, your opponents' "
+            "decisions in your hands, from their seat, or decisions in hands shared with your classes."
+        ),
+    )
+    skill = serializers.ChoiceField(choices=SKILL_CHOICES, required=False, help_text="A generated set's skill.")
     tz = TimeZoneField(required=False, default=UTC)
 
     def validate(self, attrs):
         if attrs["kind"] == "generated" and "skill" not in attrs:
             raise serializers.ValidationError({"skill": "A generated set needs its skill."})
         return attrs
+
+
+class RatingSerializer(serializers.Serializer):
+    """A Glicko rating (practice.ratings): 1,500 to start, its deviation the uncertainty, and its 95% range."""
+
+    rating = serializers.IntegerField()
+    deviation = serializers.IntegerField()
+    low = serializers.IntegerField()
+    high = serializers.IntegerField()
+    attempts = serializers.IntegerField(help_text="Graded answers it rests on.")
 
 
 class SkillScoreSerializer(serializers.Serializer):
@@ -304,6 +428,9 @@ class SkillScoreSerializer(serializers.Serializer):
     pct = serializers.FloatField(allow_null=True)
     ci_low = serializers.FloatField(allow_null=True)
     ci_high = serializers.FloatField(allow_null=True)
+    rating = RatingSerializer(
+        allow_null=True, help_text="Its rating against the spots' difficulty, once its range is narrow enough to show."
+    )
 
 
 class PracticeDaySerializer(serializers.Serializer):
@@ -312,7 +439,7 @@ class PracticeDaySerializer(serializers.Serializer):
 
 
 class GeneratedSkillSerializer(serializers.Serializer):
-    skill = serializers.ChoiceField(choices=GENERATED_SKILLS)
+    skill = serializers.ChoiceField(choices=SKILL_CHOICES)
     label = serializers.CharField()
 
 
@@ -327,14 +454,20 @@ class PracticeProfileSerializer(serializers.Serializer):
 
 
 class PlaybookSerializer(serializers.ModelSerializer):
-    """A named, versioned list of rule cards: a house preset, or one a user or coach wrote."""
+    """A named, versioned list of rule cards: a house preset, one of your own, or one a coach assigned your class."""
 
     house = serializers.SerializerMethodField(help_text="A house preset, rather than one a user wrote.")
     rule_count = serializers.SerializerMethodField()
+    author = serializers.SerializerMethodField(help_text="Who wrote it; null for a house preset.")
+    mine = serializers.SerializerMethodField(help_text="Your own: you can edit it and assign it to your classes.")
+    classes = serializers.SerializerMethodField(help_text="Your own: the classes it is assigned to now.")
 
     class Meta:
         model = Playbook
-        fields = ("id", "key", "name", "version", "game", "format", "description", "house", "rule_count")
+        fields = (
+            "id", "key", "name", "version", "game", "format", "description", "house", "rule_count", "author", "mine",
+            "classes", "archived",
+        )
         read_only_fields = fields
 
     def get_house(self, playbook) -> bool:
@@ -342,6 +475,15 @@ class PlaybookSerializer(serializers.ModelSerializer):
 
     def get_rule_count(self, playbook) -> int:
         return len(playbook.rules)
+
+    def get_author(self, playbook) -> str | None:
+        return playbook.owner.username if playbook.owner_id else None
+
+    def get_mine(self, playbook) -> bool:
+        return playbook.owner_id == self.context["request"].user.pk
+
+    def get_classes(self, playbook) -> list[str]:
+        return coaching.classes_of(playbook) if self.get_mine(playbook) else []
 
 
 class FamilyStageSerializer(serializers.Serializer):
@@ -359,10 +501,61 @@ class FamilyStageSerializer(serializers.Serializer):
 class PlaybookDetailSerializer(PlaybookSerializer):
     rules = RuleCardSerializer(many=True)
     families = FamilyStageSerializer(many=True)
+    latest = serializers.SerializerMethodField(help_text="This is its latest version: the one to edit.")
 
     class Meta(PlaybookSerializer.Meta):
-        fields = (*PlaybookSerializer.Meta.fields, "rules", "families")
+        fields = (*PlaybookSerializer.Meta.fields, "rules", "families", "latest")
         read_only_fields = fields
+
+    def get_latest(self, playbook) -> bool:
+        return coaching.latest(playbook).pk == playbook.pk
+
+
+class PlaybookCopySerializer(serializers.Serializer):
+    """A playbook of your own, to edit: a copy of one you can read."""
+
+    copy_of = serializers.PrimaryKeyRelatedField(queryset=Playbook.objects.all())
+    name = serializers.CharField(max_length=100)
+
+    def validate_copy_of(self, playbook):
+        if not coaching.can_read(self.context["request"].user, playbook):
+            raise serializers.ValidationError("Not found.")
+        return playbook
+
+
+class PlaybookVersionSerializer(serializers.Serializer):
+    """Your playbook's next version: its name and description, and every card, checked as the rule engine reads it."""
+
+    name = serializers.CharField(max_length=100)
+    description = serializers.CharField(max_length=1000, allow_blank=True)
+    rules = serializers.ListField(child=serializers.DictField(), help_text="The cards, in order: RuleCard's fields.")
+
+
+class ConditionSerializer(serializers.Serializer):
+    """Something a card's test can ask of a decision."""
+
+    key = serializers.CharField()
+    kind = serializers.ChoiceField(choices=["choice", "bool", "number", "line"])
+    label = serializers.CharField()
+    choices = serializers.ListField(child=serializers.CharField(), required=False)
+    low = serializers.FloatField(required=False)
+    high = serializers.FloatField(required=False)
+
+
+class NamedSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+
+
+class PlaybookVocabularySerializer(serializers.Serializer):
+    """What a coach's cards can say: the tests, families, scopes, reads, actions and exceptions the engine knows."""
+
+    conditions = ConditionSerializer(many=True)
+    families = NamedSerializer(many=True)
+    scopes = NamedSerializer(many=True)
+    reads = NamedSerializer(many=True)
+    actions = serializers.ListField(child=serializers.CharField())
+    unless = NamedSerializer(many=True)
 
 
 class BookQuerySerializer(serializers.Serializer):
@@ -371,7 +564,7 @@ class BookQuerySerializer(serializers.Serializer):
 
     def validate(self, attrs):
         playbook = attrs["playbook"]
-        if playbook.owner_id not in (None, self.context["request"].user.pk):
+        if not coaching.can_read(self.context["request"].user, playbook):
             raise serializers.ValidationError({"playbook": "Not found."})
         if "rule" in attrs and attrs["rule"] not in {rule["id"] for rule in playbook.rules}:
             raise serializers.ValidationError({"rule": "Not one of the playbook's cards."})
@@ -433,7 +626,7 @@ class MatchStartSerializer(serializers.Serializer):
     )
 
     def validate_playbook(self, playbook):
-        if playbook.owner_id not in (None, self.context["request"].user.pk):
+        if not coaching.can_read(self.context["request"].user, playbook):
             raise serializers.ValidationError("Not found.")
         return playbook
 
@@ -714,3 +907,182 @@ class DebriefSerializer(serializers.Serializer):
     sent = SentSerializer()
     result_bb = serializers.FloatField(allow_null=True)
     hands_played = serializers.IntegerField()
+
+
+# The aptitude test -------------------------------------------------------------------------------------------------
+
+
+class TestAnswerSerializer(AnswerSerializer):
+    """An answer to the spot a test is asking. Its grade waits for the end of the test."""
+
+    scenario = serializers.PrimaryKeyRelatedField(queryset=Scenario.objects.all())
+
+    def validate(self, attrs):
+        self.check(attrs["scenario"], attrs)
+        return attrs
+
+
+class TestSpotSerializer(serializers.Serializer):
+    position = serializers.IntegerField()
+    scenario = ScenarioSerializer()
+
+
+class TestStateSerializer(serializers.Serializer):
+    """A test as it goes: how far it has got, and the spot it asks now, without any answers."""
+
+    id = serializers.IntegerField()
+    planned = serializers.IntegerField(help_text="Spots in the test.")
+    answered = serializers.IntegerField()
+    started = serializers.DateTimeField(source="created")
+    finished = serializers.DateTimeField(allow_null=True)
+    spot = TestSpotSerializer(allow_null=True, help_text="The spot to answer now; null once the test is over.")
+
+
+class TestSkillSerializer(serializers.Serializer):
+    """A skill in the report: its accuracy in the test with its 95% range, its rating then, and the result in words."""
+
+    skill = serializers.ChoiceField(choices=SKILL_CHOICES)
+    label = serializers.CharField()
+    spots = serializers.IntegerField(help_text="Spots in the test that tested it.")
+    did = serializers.FloatField(help_text="Good answers, weighted: a rule of thumb counts half.")
+    could = serializers.FloatField()
+    pct = serializers.FloatField(allow_null=True)
+    ci_low = serializers.FloatField(allow_null=True)
+    ci_high = serializers.FloatField(allow_null=True)
+    rating = RatingSerializer(allow_null=True, help_text="The rating as it stood when the test ended.")
+    rating_shown = serializers.BooleanField(help_text="Its range is narrow enough to show the rating.")
+    words = serializers.CharField(help_text='The result in words, with its sample: "12 spots: too few to be sure".')
+
+
+class TestReportSpotSerializer(serializers.Serializer):
+    position = serializers.IntegerField()
+    scenario = ScenarioSerializer()
+    attempt = AttemptResultSerializer(help_text="Your answer, its grade, and the spot's answer and basis.")
+
+
+class PractiseNextSerializer(serializers.Serializer):
+    """What to practise next: the weakest skill whose range is narrow enough to trust, else the weakest tested."""
+
+    skill = serializers.ChoiceField(choices=SKILL_CHOICES)
+    label = serializers.CharField()
+    trusted = serializers.BooleanField(help_text="Its range is narrow enough to trust.")
+    generated = serializers.BooleanField(help_text="Generated sets can drill it.")
+
+
+class TestReportSerializer(serializers.Serializer):
+    """An aptitude test once it is over: how well you decided in these spots, skill by skill."""
+
+    id = serializers.IntegerField()
+    planned = serializers.IntegerField()
+    answered = serializers.IntegerField()
+    started = serializers.DateTimeField()
+    finished = serializers.DateTimeField()
+    minutes = serializers.FloatField(allow_null=True, help_text="Time taken over the answers.")
+    skills = TestSkillSerializer(many=True)
+    spots = TestReportSpotSerializer(many=True)
+    next = PractiseNextSerializer(allow_null=True)
+
+
+class TestSummarySerializer(serializers.ModelSerializer):
+    answered = serializers.IntegerField()
+    started = serializers.DateTimeField(source="created")
+
+    class Meta:
+        model = ScenarioSet
+        fields = ("id", "planned", "answered", "started", "finished")
+        read_only_fields = fields
+
+
+# Play it out -------------------------------------------------------------------------------------------------------
+
+
+class TableStartSerializer(serializers.Serializer):
+    """A new Play it out table: from a deal, or one of your hands played on from a spot's decision."""
+
+    scenario = serializers.PrimaryKeyRelatedField(
+        queryset=Scenario.objects.all(),
+        required=False,
+        help_text="A spot from one of your own hands: play that hand on from its decision. Else a fresh deal.",
+    )
+    seats = serializers.IntegerField(min_value=2, max_value=9, default=6, help_text="A fresh deal: seats, yours too.")
+    opponents = serializers.ChoiceField(
+        choices=play.OPPONENTS,
+        default="mixed",
+        help_text="A fresh deal: bots of one style, a mix, or modelled on your own opponents with the most hands.",
+    )
+    stack_bb = serializers.IntegerField(min_value=20, max_value=250, default=100, help_text="A fresh deal: stacks.")
+
+    def validate_scenario(self, scenario):
+        if scenario.owner_id != self.context["request"].user.pk:
+            raise serializers.ValidationError("Not found.")
+        return scenario
+
+
+class TableMoveSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=ACTIONS)
+    amount = serializers.IntegerField(required=False, min_value=1, help_text="A bet or raise: the bet it makes.")
+
+    def validate(self, attrs):
+        if attrs["action"] in ("bet", "raise") and "amount" not in attrs:
+            raise serializers.ValidationError({"amount": "A bet or raise needs its amount."})
+        return attrs
+
+
+class BasedOnSerializer(serializers.Serializer):
+    """The opponent of yours a bot was modelled on, from their statistics in your hands."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    hands = serializers.IntegerField(help_text="Hands with you behind the model.")
+
+
+class TableSeatSerializer(serializers.Serializer):
+    seat = serializers.IntegerField()
+    name = serializers.CharField()
+    hero = serializers.BooleanField()
+    label = serializers.CharField(allow_blank=True, help_text="What the bot is: a style, or who it was modelled on.")
+    style = serializers.CharField(allow_blank=True, help_text="A style bot's style; empty for a modelled one.")
+    based_on = BasedOnSerializer(allow_null=True)
+
+
+class TableSpotSerializer(serializers.Serializer):
+    """Where a table played on from a spot stands."""
+
+    scenario = serializers.IntegerField()
+    hand = serializers.IntegerField(help_text="Your hand it plays on, for its replay.")
+    step = serializers.IntegerField(help_text="The decision it started from.")
+    on_script = serializers.BooleanField(help_text="The others still replay what they did, your line matching theirs.")
+
+
+class PlayTableSerializer(serializers.Serializer):
+    """A Play it out table as you see it: the hand so far, your moves when it is your turn, and who the bots are."""
+
+    id = serializers.IntegerField()
+    hand_number = serializers.IntegerField()
+    hands_played = serializers.IntegerField()
+    small_blind = serializers.IntegerField()
+    big_blind = serializers.IntegerField()
+    hand = TableHandSerializer()
+    hand_over = serializers.BooleanField()
+    hand_net_bb = serializers.FloatField(allow_null=True)
+    legal = LegalSerializer(allow_null=True, help_text="Your moves, when it is your turn.")
+    seats = TableSeatSerializer(many=True)
+    result_bb = serializers.FloatField(help_text="Your chips won since you sat down, in big blinds, rebuys aside.")
+    spot = TableSpotSerializer(allow_null=True, help_text="A table played on from a spot: where it stands.")
+
+
+class PlayTableSummarySerializer(serializers.ModelSerializer):
+    hands = serializers.IntegerField(source="dealt", help_text="Hands dealt.")
+    players = serializers.SerializerMethodField()
+    from_spot = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PracticeTable
+        fields = ("id", "created", "updated", "hands", "players", "from_spot")
+        read_only_fields = fields
+
+    def get_players(self, table) -> int:
+        return len(table.seats)
+
+    def get_from_spot(self, table) -> bool:
+        return table.scenario_id is not None

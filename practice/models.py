@@ -16,6 +16,9 @@ class Scenario(models.Model):
         "own_hand": "One of your hands",
         "generated": "Generated",
         "match": "A coached match",
+        "library": "The library",
+        "their_seat": "An opponent's seat in one of your hands",
+        "shared": "A hand shared with your class",
     }
     GRADINGS = {
         "exact": "Exact",
@@ -37,6 +40,11 @@ class Scenario(models.Model):
     grading = models.CharField(max_length=16, choices=GRADINGS)
     skills = models.JSONField(default=list)
     tier = models.PositiveSmallIntegerField(default=1)
+    # How hard the spot is, as a Glicko rating learned from everyone's graded answers (practice.ratings); null
+    # until its first one, when its tier stands in.
+    difficulty = models.FloatField(null=True, blank=True)
+    difficulty_deviation = models.FloatField(null=True, blank=True)
+    rated = models.PositiveIntegerField(default=0)  # graded answers it has learnt from
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -56,13 +64,26 @@ class Scenario(models.Model):
 class ScenarioSet(models.Model):
     """A short run of spots, in order: today's set, a mode's set, or one built from a match's misses."""
 
-    KINDS = {"daily": "Today's set", "my_hands": "My hands", "generated": "Generated", "match": "From a match"}
+    KINDS = {
+        "daily": "Today's set",
+        "my_hands": "My hands",
+        "generated": "Generated",
+        "match": "From a match",
+        "library": "The library",
+        "their_seat": "Their seat",
+        "shared": "From your classes",
+        "test": "Aptitude test",
+    }
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="practice_sets")
     kind = models.CharField(max_length=16, choices=KINDS)
     day = models.DateField()  # the user's day it was made for
     skill = models.CharField(max_length=32, blank=True)  # a generated set's skill
     scenarios = models.ManyToManyField(Scenario, through="SetItem", related_name="sets")
+    # An aptitude test (practice.aptitude): its length, its spots chosen one at a time as it goes, and the ratings
+    # as they stood when it ended.
+    planned = models.PositiveSmallIntegerField(null=True, blank=True)
+    ratings = models.JSONField(default=dict, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     finished = models.DateTimeField(null=True, blank=True)
 
@@ -98,6 +119,7 @@ class Attempt(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="attempts")
     set = models.ForeignKey(ScenarioSet, on_delete=models.SET_NULL, null=True, blank=True, related_name="attempts")
     choice = models.PositiveSmallIntegerField(null=True, blank=True)  # a multiple-choice answer's index
+    hand_range = models.TextField(blank=True)  # a range question's answer, in range notation (hands.ranges)
     action = models.CharField(max_length=8, blank=True)  # fold, check, call, bet or raise
     amount = models.BigIntegerField(null=True, blank=True)  # a bet or raise's chips: the total it makes, `to`
     reason = models.CharField(max_length=16, blank=True)  # from the reason picker
@@ -115,6 +137,24 @@ class Attempt(models.Model):
 
     def __str__(self):
         return f"{self.user} on {self.scenario}: {self.grade}"
+
+
+class SkillScore(models.Model):
+    """A user's Glicko rating in one skill (practice.ratings), from their graded answers against the spots'
+    difficulties. Accuracy is counted from the attempts themselves (practice.sets.skill_scores)."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="skill_scores")
+    skill = models.CharField(max_length=32)
+    rating = models.FloatField(default=1500)
+    deviation = models.FloatField(default=350)
+    attempts = models.PositiveIntegerField(default=0)  # graded answers rated
+    updated = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("user", "skill"), name="one_score_per_skill")]
+
+    def __str__(self):
+        return f"{self.user} at {self.skill}: {self.rating:.0f} ± {self.deviation:.0f}"
 
 
 class Review(models.Model):
@@ -145,6 +185,8 @@ class Playbook(models.Model):
     format = models.CharField(max_length=16)
     description = models.TextField(blank=True)
     rules = models.JSONField()
+    # A coach's playbook put away: out of their lists and their classes', its versions kept for the matches played.
+    archived = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -175,18 +217,26 @@ class RuleProgress(models.Model):
 
 
 class PracticeTable(models.Model):
-    """A table on the server where a user plays whole hands against bots, one PracticeHand after another.
+    """A table on the server where a user plays whole hands against bots, one PracticeHand after another: a coached
+    match's, or a Play it out table (practice.play) of two to nine seats.
 
-    `seats` holds each seat's name, stack between hands and, for a bot, its style and leak, which stay on the
-    server until a match's debrief.
+    `seats` holds each seat's name, stack between hands and, for a bot, its style and leak (which stay on the server
+    until a match's debrief) or its profile (practice.bots), with the opponent it was modelled on.
     """
 
+    KINDS = {"match": "A coached match", "play": "Play it out"}
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="practice_tables")
+    kind = models.CharField(max_length=8, choices=KINDS, default="match")
     seats = models.JSONField()
     small_blind = models.PositiveIntegerField()
     big_blind = models.PositiveIntegerField()
+    ante = models.PositiveIntegerField(default=0)
+    currency = models.CharField(max_length=3, blank=True)  # a table played out from a hand for money
     button_seat = models.PositiveSmallIntegerField()
     hands_played = models.PositiveIntegerField(default=0)
+    # The spot a Play it out table started from: its first hand is that hand of the user's, from that decision.
+    scenario = models.ForeignKey(Scenario, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
@@ -207,6 +257,11 @@ class PracticeHand(models.Model):
     stacks = models.JSONField()  # each seat's chips at the start, in seat order
     deck = models.CharField(max_length=104)
     moves = models.JSONField(default=list)
+    # Played out from a spot: the moves before it, which were the hand's own, the moves recorded after it, which the
+    # others replay while the user's line matches, and the board cards dealt by then (practice.play).
+    scripted = models.PositiveSmallIntegerField(default=0)
+    script = models.JSONField(default=list, blank=True)
+    script_board = models.PositiveSmallIntegerField(default=0)
     replay = models.JSONField(default=dict)
     phh = models.TextField(blank=True)
     finished = models.BooleanField(default=False)

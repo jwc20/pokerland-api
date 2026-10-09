@@ -51,9 +51,12 @@ class PracticeTestCase(APITestCase):
 
     @staticmethod
     def right_answer(scenario):
-        if scenario.spec["question"]["kind"] == "choice":
+        kind = scenario.spec["question"]["kind"]
+        if kind == "choice":
             return {"choice": scenario.answer["correct"]}
-        if scenario.grading == "exact":
+        if kind == "range":
+            return {"hand_range": scenario.answer["range"]}
+        if scenario.grading in ("exact", "reference"):
             best = scenario.answer["best"][0]
             return {"action": best, **({"amount": scenario.spec["legal"]["max_to"]} if best == "raise" else {})}
         advice = scenario.answer.get("advice")
@@ -257,6 +260,43 @@ class ModeSetTests(PracticeTestCase):
 
         self.assertEqual(response.status_code, 400)
 
+    def test_preflop_spots_are_graded_by_the_chart(self):
+        data = self.client.post("/api/practice/sets/", {"kind": "generated", "skill": "preflop"}, format="json").data
+        spots = data["spots"]
+
+        self.assertEqual({spot["scenario"]["grading"] for spot in spots}, {"reference"})
+        self.assertEqual({len(spot["scenario"]["spec"]["hand"]["players"]) for spot in spots}, {9})
+        spot = spots[0]
+        scenario = Scenario.objects.get(pk=spot["scenario"]["id"])
+        attempt = self.answer(spot, data["id"], **self.right_answer(scenario))
+
+        self.assertEqual(attempt["grade"], "good")
+        self.assertEqual(attempt["answer"]["chart"]["key"], "mit5_value_zone")
+        self.assertIn(attempt["answer"]["hand"], attempt["answer"]["explanation"])
+
+    def test_a_range_question_earns_its_overlap(self):
+        data = self.client.post("/api/practice/sets/", {"kind": "generated", "skill": "hand_reading"}, format="json")
+        spots = data.data["spots"]
+        first, second = (Scenario.objects.get(pk=spot["scenario"]["id"]) for spot in spots[:2])
+
+        self.assertEqual(first.spec["question"]["kind"], "range")
+        self.assertNotIn("legal", first.spec)
+        exact = self.answer(spots[0], data.data["id"], hand_range=first.answer["range"])
+        self.assertEqual((exact["grade"], exact["score"]), ("good", 1.0))
+        self.assertEqual(exact["overlap"]["extra"], 0)
+        nothing = self.answer(spots[1], data.data["id"], hand_range="")
+        self.assertEqual(nothing["grade"], "poor")
+        self.assertEqual(nothing["overlap"]["both"], 0)
+
+    def test_a_range_must_be_one_the_grid_can_read(self):
+        data = self.client.post("/api/practice/sets/", {"kind": "generated", "skill": "hand_reading"}, format="json")
+        spot = data.data["spots"][0]
+        body = {"scenario": spot["scenario"]["id"], "hand_range": "AK, 9z", "tz": "UTC"}
+
+        self.assertEqual(self.client.post("/api/practice/attempts/", body, format="json").status_code, 400)
+        del body["hand_range"]
+        self.assertEqual(self.client.post("/api/practice/attempts/", body, format="json").status_code, 400)
+
     def test_hands_flagged_to_review_come_first_however_long_ago(self):
         flagged = Hand.objects.get(hand_id="262289811345")
         HandNote.objects.create(user=self.user, hand=flagged, kind="review", value="to_review")
@@ -266,6 +306,50 @@ class ModeSetTests(PracticeTestCase):
 
         self.assertEqual(picked[0][1], flagged)
         self.assertEqual({hand.hand_id for _, hand, _, _ in picked}, {"262300000002", "262289811345"})
+
+
+class LibraryTests(PracticeTestCase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch("practice.library.EQUITY_SAMPLES", 2000)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def library_set(self):
+        response = self.client.post("/api/practice/sets/", {"kind": "library"}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        return response.data
+
+    def test_the_library_is_saved_once_for_everyone(self):
+        first = self.library_set()
+
+        self.assertEqual(len(first["spots"]), sets.DAILY_SIZE)
+        self.assertEqual({spot["scenario"]["source"] for spot in first["spots"]}, {"library"})
+        self.assertEqual(Scenario.objects.filter(source="library").count(), len(sets.library.ENTRIES))
+        self.library_set()
+        self.assertEqual(Scenario.objects.filter(source="library").count(), len(sets.library.ENTRIES))
+
+    def test_spots_not_yet_tried_come_first(self):
+        first = self.library_set()
+        for spot in first["spots"]:
+            self.answer(spot, first["id"])
+        tried = {spot["scenario"]["id"] for spot in first["spots"]}
+
+        second = self.library_set()
+        fresh = len(sets.library.ENTRIES) - len(tried)
+        self.assertFalse(tried & {spot["scenario"]["id"] for spot in second["spots"][:fresh]})
+
+    def test_a_spot_with_no_table_has_its_setup(self):
+        self.library_set()
+        akq = Scenario.objects.get(source="library", origin__library="akq_king_calls")
+        practice_set = sets.save_set(self.user, "library", TODAY, [(akq, False)])
+        spec = self.client.get(f"/api/practice/sets/{practice_set.pk}/").data["spots"][0]["scenario"]["spec"]
+
+        self.assertIsNone(spec["hand"])
+        self.assertIn("AKQ game", spec["setup"])
+        self.assertEqual((spec["title"], spec["credit"]), ("The AKQ game: the king's calls", "MIT 8"))
+        answered = self.answer({"scenario": {"id": akq.pk}}, practice_set.pk)
+        self.assertEqual(answered["grade"], "good")
 
 
 class ProfileTests(PracticeTestCase):

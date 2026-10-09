@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "tracker",
     "hands",
     "practice",
+    "leagues",
 ]
 
 MIDDLEWARE = [
@@ -127,9 +128,11 @@ SPECTACULAR_SETTINGS = {
         "HandTagGroupEnum": "hands.filters.TAG_GROUPS",
         "PracticeActionEnum": "practice.serializers.ACTIONS",
         "PracticeSkillEnum": "practice.serializers.SKILL_CHOICES",
-        "GeneratedSkillEnum": "practice.serializers.GENERATED_SKILLS",
         "MatchOpponentEnum": "practice.models.CoachedMatch.OPPONENTS",
         "MatchCoachEnum": "practice.models.CoachedMatch.COACH",
+        "TableOpponentsEnum": "practice.play.OPPONENTS",
+        "AssignmentKindEnum": "leagues.models.Assignment.KINDS",
+        "LeagueRoleEnum": "leagues.models.Membership.ROLES",
         "NoteAuthorEnum": "practice.serializers.AUTHORS",
         "HandNoteKindEnum": "hands.models.HandNote.Kind",
         "NotePurposeEnum": "hands.notes.PURPOSES",

@@ -99,7 +99,7 @@ def advance(match, row, hand, rng=None):
     bot = next(seat for seat in match.table.seats if seat["name"] == VILLAIN)
     while hand.actor == VILLAIN:
         context = pending(hand.replay(VILLAIN))
-        hand.act(VILLAIN, *bots.decide(context, hand.legal(), bot["style"], bot["leak"], rng))
+        hand.act(VILLAIN, *bots.move(context, hand.legal(), bot, rng))
     row.moves = hand.moves
     row.replay = hand.replay(HERO)
     if hand.finished:
