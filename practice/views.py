@@ -8,8 +8,6 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from hands.filters import PLAYED
-from hands.models import Hand
 from practice import aptitude, book, coaching, debrief, matches, play, sets, shared, theirs
 from practice.models import Attempt, CoachedMatch, Playbook, PracticeTable, Review, ScenarioSet
 from practice.playbook import ACTIONS, CONDITIONS, FAMILIES, READS, PlaybookError
@@ -162,7 +160,8 @@ class PlaybookListView(APIView):
     @extend_schema(responses=PlaybookSerializer(many=True))
     def get(self, request):
         playbooks = coaching.visible(request.user)
-        return Response(PlaybookSerializer(playbooks, many=True, context={"request": request}).data)
+        context = {"request": request, "classes": coaching.classes_by_playbook(request.user)}
+        return Response(PlaybookSerializer(playbooks, many=True, context=context).data)
 
     @extend_schema(request=PlaybookCopySerializer, responses={status.HTTP_201_CREATED: PlaybookDetailSerializer})
     def post(self, request):
@@ -250,15 +249,7 @@ class BookView(APIView):
         query = BookQuerySerializer(data=request.query_params, context={"request": request})
         query.is_valid(raise_exception=True)
         playbook, rule = query.validated_data["playbook"], query.validated_data.get("rule")
-        found = book.by_the_book(request.user, playbook.rules)
-        counted = Hand.objects.filter(PLAYED, user=request.user, played_at__lt=timezone.now() - sets.MIN_AGE)
-        data = {
-            "hands": min(counted.count(), book.RECENT_HANDS),
-            "rules": book.summarise(found),
-        }
-        if rule:
-            data["chances"] = book.listed(found[rule])
-        return Response(BookSerializer(data).data)
+        return Response(BookSerializer(book.report(request.user, playbook, rule)).data)
 
 
 class MatchListView(APIView):

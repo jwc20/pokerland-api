@@ -8,6 +8,7 @@ Never their hands: only those totals (feature ideas, section 7.6).
 """
 
 import secrets
+from collections import defaultdict
 
 from django.db import transaction
 from django.db.models import Q
@@ -37,7 +38,7 @@ def visible(user):
     sets.house_playbook()
     rows = Playbook.objects.filter(Q(owner=None) | Q(owner=user, archived=False) | Q(pk__in=assigned(user)))
     newest = {}
-    for playbook in rows.order_by("owner_id", "key", "-version"):
+    for playbook in rows.select_related("owner").order_by("owner_id", "key", "-version"):
         newest.setdefault((playbook.owner_id, playbook.key), playbook)
     return sorted(newest.values(), key=lambda playbook: (playbook.owner_id is not None, playbook.name.lower()))
 
@@ -47,6 +48,16 @@ def can_read(user, playbook):
     if playbook.owner_id in (None, user.pk):
         return True
     return Playbook.objects.filter(pk__in=assigned(user), owner=playbook.owner, key=playbook.key).exists()
+
+
+def classes_by_playbook(user):
+    """The classes each of the user's own playbooks is assigned to now, by name, in one query:
+    {(owner id, key): [names]}, for listing them all."""
+    found = defaultdict(set)
+    assignments = Assignment.objects.filter(kind="playbook", withdrawn=False, playbook__owner=user)
+    for owner_id, key, name in assignments.values_list("playbook__owner_id", "playbook__key", "league__name"):
+        found[(owner_id, key)].add(name)
+    return {playbook: sorted(names) for playbook, names in found.items()}
 
 
 def classes_of(playbook):
@@ -107,7 +118,12 @@ def archive(playbook):
 
 def stages(user, playbook):
     """A user's stage in each of a playbook's rule families: 1 until a match moves it."""
-    progress = {row.family: row for row in RuleProgress.objects.filter(user=user, playbook_key=playbook.key)}
+    rows = RuleProgress.objects.filter(user=user, playbook_key=playbook.key)
+    return _stages({row.family: row for row in rows}, playbook)
+
+
+def _stages(progress, playbook):
+    """stages from a user's RuleProgress rows for the playbook, by family."""
     used = dict.fromkeys(rule["family"] for rule in playbook.rules)
     return [
         {
@@ -124,10 +140,32 @@ def stages(user, playbook):
 def progress(member, playbooks, with_book=False):
     """What a coach sees of a member who shares their progress: practice accuracy by skill, and for each of the
     class's playbooks their stage in each family and, with `with_book`, how their own hands kept each rule."""
-    found = {"skills": sets.skill_scores(member), "playbooks": []}
-    for playbook in playbooks:
-        entry = {"playbook": playbook.pk, "name": playbook.name, "families": stages(member, playbook)}
-        if with_book:
-            entry["book"] = book.summarise(book.by_the_book(member, playbook.rules))
-        found["playbooks"].append(entry)
+    found = progress_of([member], playbooks)[member.pk]
+    if with_book:
+        for entry, playbook in zip(found["playbooks"], playbooks, strict=True):
+            entry["book"] = book.report(member, playbook)["rules"]
     return found
+
+
+def progress_of(members, playbooks):
+    """`progress` without by the book for several members at once, as a class's coaches see it, in the same few
+    queries however many there are: {user id: progress}."""
+    ids = [member.pk for member in members]
+    skills = sets.skill_scores_of(ids)
+    rows = defaultdict(dict)
+    for row in RuleProgress.objects.filter(user_id__in=ids, playbook_key__in={playbook.key for playbook in playbooks}):
+        rows[(row.user_id, row.playbook_key)][row.family] = row
+    return {
+        user_id: {
+            "skills": skills[user_id],
+            "playbooks": [
+                {
+                    "playbook": playbook.pk,
+                    "name": playbook.name,
+                    "families": _stages(rows[(user_id, playbook.key)], playbook),
+                }
+                for playbook in playbooks
+            ],
+        }
+        for user_id in ids
+    }

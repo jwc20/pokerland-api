@@ -8,9 +8,9 @@ from django.core.management import call_command
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
 
-from hands.models import Hand, HandNote
+from hands.models import Hand, HandNote, KeptResult
 from hands.tests import add_stream, schema_properties
-from practice import sets
+from practice import book, sets
 from practice.models import Attempt, Review, RuleProgress, Scenario, ScenarioSet
 from practice.spots import decisions
 
@@ -433,10 +433,39 @@ class PlaybookTests(PracticeTestCase):
         self.assertEqual((chance["hand_id"], chance["step"], chance["followed"]), ("219700000004", 3, False))
         self.assertEqual(chance["move"]["action"], "fold")
 
+    def test_by_the_book_reads_the_hands_once_for_the_summary_and_every_rule(self):
+        with mock.patch("practice.book.by_the_book", wraps=book.by_the_book) as reading:
+            summary = self.book()
+            raise_rule = self.book(rule="button_raise_every_hand")
+            price_rule = self.book(rule="price_to_call")
+            again = self.book(rule="button_raise_every_hand")
+
+        self.assertEqual(reading.call_count, 1)
+        self.assertEqual((raise_rule["rules"], again), (summary["rules"], raise_rule))
+        self.assertEqual(len(price_rule["chances"]), 6)
+        KeptResult.objects.all().delete()  # read afresh, it says the same
+        self.assertEqual(self.book(rule="button_raise_every_hand"), raise_rule)
+
+    def test_by_the_book_reads_again_once_another_hand_is_a_day_old(self):
+        latest = Hand.objects.filter(user=self.user).order_by("-played_at").first()
+        Hand.objects.filter(pk=latest.pk).update(played_at=NOW - datetime.timedelta(hours=2))  # too recent to read
+        before = self.book()["hands"]
+        with mock.patch("django.utils.timezone.now", return_value=NOW + datetime.timedelta(days=1)):
+            after = self.book()["hands"]
+
+        self.assertEqual(after, before + 1)
+
     def test_a_rule_must_be_one_of_the_playbooks(self):
         response = self.client.get("/api/practice/hands/by-the-book/", {"playbook": self.playbook.pk, "rule": "x"})
 
         self.assertEqual(response.status_code, 400)
+
+    def test_an_adjustment_isnt_counted_so_it_has_no_hands_to_list(self):
+        params = {"playbook": self.playbook.pk, "rule": "no_bluffs_vs_caller"}
+        response = self.client.get("/api/practice/hands/by-the-book/", params)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("adjustment", str(response.data["rule"]))
 
 
 class GenerateCommandTests(PracticeTestCase):
