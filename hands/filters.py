@@ -109,8 +109,14 @@ def stat_filter(stat, did=None):
 
 
 def narrow(hands, filters):
-    """`hands` narrowed by the validated filters of hands.serializers.HandFilterSerializer and its subclasses."""
+    """`hands` narrowed by the validated filters of hands.serializers.HandFilterSerializer and its subclasses.
+
+    A spot, a spec, an opponent or a tournament comes as a Q the serializer built (`where`), since building it
+    takes the user's own spots, opponents and tournaments.
+    """
     tz = filters.get("tz", UTC)
+    for condition in filters.get("where", []):
+        hands = hands.filter(condition)
     for key in filters.get("tag", []):
         hands = hands.filter(tag_filter(key))
     if "since" in filters:

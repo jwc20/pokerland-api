@@ -23,6 +23,7 @@ NOTE_STREETS = ("", "preflop", "flop", "turn", "river")  # empty for a note on t
 STREET_ORDER = ("preflop", "flop", "turn", "river")
 TAG_LENGTH = 32
 NOTE_LENGTH = 2000
+WRITEUP_LENGTH = 20000  # a hand written up to show others (E2), street by street
 QUEUE_LENGTH = 5  # the review queue's hands that /api/review/ lists
 OUTCOMES = ("folded", "called", "raised")
 

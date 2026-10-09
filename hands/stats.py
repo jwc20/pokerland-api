@@ -3,19 +3,49 @@
 import datetime
 import math
 
-from django.db.models import Count, F, FloatField, OuterRef, Q, Subquery, Sum
+from django.db.models import Case, CharField, Count, F, FloatField, Max, OuterRef, Q, Subquery, Sum, Value, When
 from django.db.models.functions import Cast, Coalesce, NullIf, TruncDate, TruncMonth
 
+from hands import ranges
 from hands.filters import FORMAT, stakes_value, tag_key
-from hands.models import HandPlayer
-from tracker.parsing.facts import POSTFLOP_ACTIONS, STATS
+from hands.models import HandBet, HandPlayer
+from tracker.parsing.facts import ALL_HAND_GROUPS, POSTFLOP_ACTIONS, STATS
 
 # How a 95% interval reaches either side of an estimate, in standard errors.
 Z95 = 1.96
 # Positions from the first to act before the flop to the last; any other sorts after them.
 POSITION_ORDER = ("UTG", "UTG+1", "UTG+2", "UTG+3", "UTG+4", "LJ", "HJ", "CO", "BTN", "SB", "BB")
-# What /api/stats/ can group the hero's hands by. Stakes are cash games' alone: tournament blinds go up every level.
-STAT_GROUPINGS = ("none", "position", "month", "stakes")
+# What /api/stats/ can group the hero's hands by (FND-4). Stakes are cash games' alone, since tournament blinds go up
+# every level, and the M zone tournaments' alone.
+STAT_GROUPINGS = (
+    "none",
+    "position",
+    "month",
+    "stakes",
+    "situation",
+    "stack_depth",
+    "m_zone",
+    "hand_group",
+    "combo",
+    "bet_size",
+    "opponent",
+)
+SITUATION_ORDER = ("unopened", "limped", "raised", "3bet", "4bet+", "none")
+# Effective stacks in big blinds, from short to deep [MIT 2: the stack-size report; JHU 6], each (key, from, to).
+STACK_DEPTHS = (("0-10", None, 10), ("10-20", 10, 20), ("20-40", 20, 40), ("40-100", 40, 100), ("100+", 100, None))
+# The MIT course's M zones [MIT 5]: dead, push or fold, steal and re-steal, value-betting, set-mining.
+M_ZONES = (("dead", None, 2), ("push_fold", 2, 8), ("restealing", 8, 12), ("value", 12, 30), ("set_mining", 30, None))
+# The hero's biggest bet or raise after the flop, as a share of what was in the middle [B4].
+BET_SIZES = (
+    ("under_third", None, 0.33),
+    ("third_half", 0.33, 0.5),
+    ("half_three_quarters", 0.5, 0.75),
+    ("three_quarters_pot", 0.75, 0.99),
+    ("pot_plus", 0.99, None),
+)
+BET_SIZE_KEYS = tuple(key for key, _, _ in BET_SIZES)
+FIRST_ACTIONS = ("fold", "check", "call", "raise")
+OPPONENT_GROUPS = 50  # the opponents grouping's default: the players the hero played most hands with
 
 
 def hand_bb():
@@ -173,14 +203,41 @@ def with_hero_all_in(hands):
     )
 
 
-def hero_stats(hands, group_by="none", tz=None):
-    """The hero's statistics over `hands`, in one group, or one per position, per month in `tz`, or per cash stakes.
+def bucketed(column, buckets):
+    """A Case naming the bucket `column`'s value falls in, from (key, from, to) triples: from it, up to but not
+    including the next."""
+    whens = []
+    for key, low, high in buckets:
+        condition = Q()
+        if low is not None:
+            condition &= Q(**{f"{column}__gte": low})
+        if high is not None:
+            condition &= Q(**{f"{column}__lt": high})
+        whens.append(When(condition, then=Value(key)))
+    return Case(*whens, default=Value(""), output_field=CharField())
+
+
+def _grouped(rows, key, sums, order):
+    """`rows` summed by `key`, the groups in `order` (keys outside it after, by name), without the empty key."""
+    found = [(row.pop("key"), row) for row in rows.annotate(key=key).values("key").annotate(**sums).order_by()]
+    rank = {name: i for i, name in enumerate(order)}
+    found = [(name, row) for name, row in found if name not in ("", None)]
+    return sorted(found, key=lambda group: (rank.get(group[0], len(rank)), str(group[0])))
+
+
+def hero_stats(hands, group_by="none", tz=None, limit=OPPONENT_GROUPS):
+    """The hero's statistics over `hands`, in one group or one per key of `group_by` (STAT_GROUPINGS): position,
+    month in `tz`, cash stakes, preflop situation, effective stack, M zone, starting-hand group or combo, the size
+    of their biggest bet after the flop, or the opponent dealt in (the `limit` they played most hands with; a hand
+    counts for each of its opponents).
 
     Each group has its hands, their net and its spread in big blinds (as the
     tags have them), the rake (`rake_share`, and the net before it), the net
-    adjusted for all-in equity with its all-ins, and every statistic of
-    tracker.parsing.facts.STATS as a proportion, with the aggression frequency
-    after the flop: (bets + raises) ÷ (bets + raises + calls + folds).
+    adjusted for all-in equity with its all-ins, how the hero's first decision
+    before the flop went, how often they moved in when they raised it, and every
+    statistic of tracker.parsing.facts.STATS as a proportion, with the
+    aggression frequency after the flop: (bets + raises) ÷ (bets + raises +
+    calls + folds).
     """
     rows = HandPlayer.objects.filter(is_hero=True, hand__in=hands)
     counted = [f"{stat}_{part}" for stat in STATS for part in ("could", "did")]
@@ -195,8 +252,39 @@ def hero_stats(hands, group_by="none", tz=None):
         # A4: the net expected when the money went in before the river, else the net.
         "total_ev_bb": Sum(Coalesce("ev_net_bb", "net_bb"), default=0.0),
         "total_all_ins": Count("id", filter=Q(ev_net_bb__isnull=False)),
+        # The first decision before the flop, and raises that moved in.
+        **{f"total_first_{action}": Count("id", filter=Q(first_action=action)) for action in FIRST_ACTIONS},
+        "total_raised": Count("id", filter=Q(first_raise_all_in__isnull=False)),
+        "total_shoved": Count("id", filter=Q(first_raise_all_in=True)),
         **{f"total_{column}": Sum(column, default=0) for column in counted},
     }
+    groups = _groups(rows, group_by, tz, sums, limit)
+    return [_stat_group(key, totals) for key, totals in groups]
+
+
+def _groups(rows, group_by, tz, sums, limit):
+    """The (key, sums) pairs of `rows` grouped by `group_by`."""
+    if group_by == "situation":
+        situation = Case(When(situation="", then=Value("none")), default=F("situation"), output_field=CharField())
+        return _grouped(rows, situation, sums, SITUATION_ORDER)
+    if group_by == "stack_depth":
+        return _grouped(rows, bucketed("hand__effective_bb", STACK_DEPTHS), sums, [key for key, _, _ in STACK_DEPTHS])
+    if group_by == "m_zone":
+        zoned = rows.filter(hand__hero_m__isnull=False)
+        return _grouped(zoned, bucketed("hand__hero_m", M_ZONES), sums, [key for key, _, _ in M_ZONES])
+    if group_by == "combo":
+        return _grouped(rows.exclude(hand__hero_combo=""), F("hand__hero_combo"), sums, ())
+    if group_by == "hand_group":
+        return _hand_groups(rows, sums)
+    if group_by == "bet_size":
+        biggest = HandBet.objects.filter(hand=OuterRef("hand"), is_hero=True, street__in=("flop", "turn", "river"))
+        sized = rows.annotate(biggest=Subquery(biggest.values("hand").annotate(top=Max("size")).values("top")[:1]))
+        return _grouped(sized, bucketed("biggest", BET_SIZES), sums, [key for key, _, _ in BET_SIZES])
+    if group_by == "opponent":
+        # One join to the opponents' rows, in one filter() so the key and the sums share it.
+        shared = rows.filter(hand__seats__is_hero=False)
+        found = shared.annotate(key=F("hand__seats__name")).values("key").annotate(**sums).order_by("-hands", "key")
+        return [(row.pop("key"), row) for row in found[:limit]]
     if group_by == "position":
         groups = [(row.pop("position"), row) for row in rows.values("position").annotate(**sums).order_by()]
         rank = {position: i for i, position in enumerate(POSITION_ORDER)}
@@ -213,7 +301,19 @@ def hero_stats(hands, group_by="none", tz=None):
         ]
     else:
         groups = [("all", rows.aggregate(**sums))]
-    return [_stat_group(key, totals) for key, totals in groups]
+    return groups
+
+
+def _hand_groups(rows, sums):
+    """The combos' sums gathered into the JHU starting-hand groups (tracker.parsing.facts.hand_group)."""
+    totals = {}
+    for combo, row in _grouped(rows.exclude(hand__hero_combo=""), F("hand__hero_combo"), sums, ()):
+        group = ranges.group_of(combo)
+        if group in totals:
+            totals[group] = {name: totals[group][name] + value for name, value in row.items()}
+        else:
+            totals[group] = row
+    return [(group, totals[group]) for group in ALL_HAND_GROUPS if group in totals]
 
 
 def _stat_group(key, sums):
@@ -224,6 +324,8 @@ def _stat_group(key, sums):
     stats["aggression"] = proportion(aggressive, aggressive + total["postflop_calls"] + total["postflop_folds"])
     return {
         "key": key,
+        "first_actions": {action: proportion(total[f"first_{action}"], total["hands"]) for action in FIRST_ACTIONS},
+        "shove": proportion(total["shoved"], total["raised"]),
         "hands": total["hands"],
         "net_bb": round(total["bb"], 2),
         "bb_stdev": None if stdev is None else round(stdev, 2),

@@ -1,0 +1,108 @@
+PokerStars Hand #262400000001:  Hold'em No Limit (100/200) - 2026/10/06 3:00:00 UTC [2026/10/05 23:00:00 ET]
+Table 'Fixture J' 6-max (Play Money) Seat #1 is the button
+Seat 1: Alice (20000 in chips)
+Seat 2: Bob (20000 in chips)
+Seat 3: Carol (20000 in chips)
+Bob: posts small blind 100
+Carol: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Kh Qd]
+Alice: raises 400 to 600
+Bob: folds
+Carol: calls 400
+*** FLOP *** [Kc 8d 3s]
+Carol: checks
+Alice: bets 600
+Carol: calls 600
+*** TURN *** [Kc 8d 3s] [2h]
+Carol: checks
+Alice: checks
+*** RIVER *** [Kc 8d 3s 2h] [7c]
+Carol: checks
+Alice: checks
+*** SHOW DOWN ***
+Carol: shows [8h 9h] (a pair of Eights)
+Alice: shows [Kh Qd] (a pair of Kings)
+Alice collected 2500 from pot
+*** SUMMARY ***
+Total pot 2500 | Rake 0
+Board [Kc 8d 3s 2h 7c]
+Seat 1: Alice (button) showed [Kh Qd] and won (2500) with a pair of Kings
+Seat 2: Bob (small blind) folded before Flop
+Seat 3: Carol (big blind) showed [8h 9h] and lost with a pair of Eights
+
+
+
+PokerStars Hand #262400000002:  Hold'em No Limit (100/200) - 2026/10/06 3:05:00 UTC [2026/10/05 23:05:00 ET]
+Table 'Fixture J' 6-max (Play Money) Seat #2 is the button
+Seat 1: Alice (40000 in chips)
+Seat 2: Bob (40000 in chips)
+Seat 3: Carol (40000 in chips)
+Carol: posts small blind 100
+Alice: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Qs Jd]
+Bob: raises 400 to 600
+Carol: folds
+Alice: calls 400
+*** FLOP *** [Ah Qc 6d]
+Alice: checks
+Bob: bets 800
+Alice: calls 800
+*** TURN *** [Ah Qc 6d] [3s]
+Alice: checks
+Bob: bets 2000
+Alice: calls 2000
+*** RIVER *** [Ah Qc 6d 3s] [9c]
+Alice: checks
+Bob: bets 5000
+Alice: calls 5000
+*** SHOW DOWN ***
+Bob: shows [As Kd] (a pair of Aces)
+Alice: shows [Qs Jd] (a pair of Queens)
+Bob collected 16900 from pot
+*** SUMMARY ***
+Total pot 16900 | Rake 0
+Board [Ah Qc 6d 3s 9c]
+Seat 1: Alice (big blind) showed [Qs Jd] and lost with a pair of Queens
+Seat 2: Bob (button) showed [As Kd] and won (16900) with a pair of Aces
+Seat 3: Carol (small blind) folded before Flop
+
+
+
+PokerStars Hand #262400000003:  Hold'em No Limit (100/200) - 2026/10/06 3:10:00 UTC [2026/10/05 23:10:00 ET]
+Table 'Fixture J' 6-max (Play Money) Seat #3 is the button
+Seat 1: Alice (20000 in chips)
+Seat 2: Bob (20000 in chips)
+Seat 3: Carol (20000 in chips)
+Seat 4: Dave (20000 in chips)
+Seat 5: Erin (20000 in chips)
+Dave: posts small blind 100
+Erin: posts big blind 200
+*** HOLE CARDS ***
+Dealt to Alice [Ac Jc]
+Alice: raises 400 to 600
+Bob: calls 600
+Carol: calls 600
+Dave: folds
+Erin: calls 400
+*** FLOP *** [9h 5d 2s]
+Erin: checks
+Alice: bets 1200
+Bob: folds
+Carol: folds
+Erin: folds
+Uncalled bet (1200) returned to Alice
+Alice collected 2500 from pot
+Alice: doesn't show hand
+*** SUMMARY ***
+Total pot 2500 | Rake 0
+Board [9h 5d 2s]
+Seat 1: Alice collected (2500)
+Seat 2: Bob folded on the Flop
+Seat 3: Carol (button) folded on the Flop
+Seat 4: Dave (small blind) folded before Flop
+Seat 5: Erin (big blind) folded on the Flop
+
+
+

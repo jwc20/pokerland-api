@@ -97,6 +97,14 @@ def value(hole, board, omaha=False):
     return max(_best([*two, *three]) for two in combinations(hole, 2) for three in combinations(board, 3))
 
 
+def is_nuts(hole, board):
+    """Whether no two cards left in the deck make a better hold'em hand than `hole` on `board`: ties allowed."""
+    parsed = [PARSED[card] for card in board]
+    mine = _best([PARSED[card] for card in hole] + parsed)
+    left = [PARSED[card] for card in CARDS if card not in hole and card not in board]
+    return not any(_best([one, two, *parsed]) > mine for one, two in combinations(left, 2))
+
+
 def run_outs(board, known, rng, *, omaha=False, samples=None):
     """Complete boards from `board`: every one when two cards or fewer are to come (one in Omaha), else `samples`
     drawn with `rng` from the cards left. Returns (boards, whether they are every one)."""

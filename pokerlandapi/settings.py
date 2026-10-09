@@ -106,6 +106,8 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Rates for the views that opt in with ScopedRateThrottle: the public share links, which need no sign-in.
+    "DEFAULT_THROTTLE_RATES": {"public_share": "60/minute"},
 }
 
 # OpenAPI schema, served at /api/schema/ outside prod. pokerland-client generates
@@ -132,6 +134,9 @@ SPECTACULAR_SETTINGS = {
         "HandNoteKindEnum": "hands.models.HandNote.Kind",
         "NotePurposeEnum": "hands.notes.PURPOSES",
         "ReviewStateEnum": "hands.notes.REVIEW_STATES",
+        "BetSizeEnum": "hands.stats.BET_SIZE_KEYS",
+        "OpponentLabelEnum": "hands.models.Opponent.Label",
+        "StatGroupingEnum": "hands.stats.STAT_GROUPINGS",
     },
 }
 

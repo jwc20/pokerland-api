@@ -1,0 +1,173 @@
+PokerStars Hand #263100000001: Tournament #3100000001, $1+$1+$0.20 USD Hold'em No Limit - Level I (10/20) - 2026/10/06 20:00:00 UTC [2026/10/06 16:00:00 ET]
+Table '3100000001 1' 9-max Seat #1 is the button
+Seat 1: Alice (1500 in chips)
+Seat 2: Bob (1500 in chips)
+Seat 3: Carol (1500 in chips)
+Seat 4: Dave (400 in chips)
+Bob: posts small blind 10
+Carol: posts big blind 20
+*** HOLE CARDS ***
+Dealt to Alice [Ah Ad]
+Dave: raises 380 to 400 and is all-in
+Alice: raises 1100 to 1500 and is all-in
+Bob: folds
+Carol: folds
+Uncalled bet (1100) returned to Alice
+*** FLOP *** [7c 2d 9s]
+*** TURN *** [7c 2d 9s] [Kh]
+*** RIVER *** [7c 2d 9s Kh] [3c]
+*** SHOW DOWN ***
+Dave: shows [Qs Qh] (a pair of Queens)
+Alice: shows [Ah Ad] (a pair of Aces)
+Alice collected 830 from pot
+Alice wins $0.50 for eliminating Dave and their own bounty increases by $0.50 to $1.50
+Dave finished the tournament in 4th place
+*** SUMMARY ***
+Total pot 830 | Rake 0
+Board [7c 2d 9s Kh 3c]
+Seat 1: Alice (button) showed [Ah Ad] and won (830) with a pair of Aces
+Seat 2: Bob (small blind) folded before Flop
+Seat 3: Carol (big blind) folded before Flop
+Seat 4: Dave showed [Qs Qh] and lost with a pair of Queens
+
+
+
+PokerStars Hand #263100000002: Tournament #3100000001, $1+$1+$0.20 USD Hold'em No Limit - Level II (15/30) - 2026/10/06 20:10:00 UTC [2026/10/06 16:10:00 ET]
+Table '3100000001 1' 9-max Seat #2 is the button
+Seat 1: Alice (1930 in chips)
+Seat 2: Bob (1490 in chips)
+Seat 3: Carol (1480 in chips)
+Carol: posts small blind 15
+Alice: posts big blind 30
+*** HOLE CARDS ***
+Dealt to Alice [Kd Qd]
+Bob: raises 1460 to 1490 and is all-in
+Carol: folds
+Alice: calls 1460
+*** FLOP *** [Kc 8h 3s]
+*** TURN *** [Kc 8h 3s] [6d]
+*** RIVER *** [Kc 8h 3s 6d] [2c]
+*** SHOW DOWN ***
+Bob: shows [Ah 7h] (high card Ace)
+Alice: shows [Kd Qd] (a pair of Kings)
+Alice collected 2995 from pot
+Alice wins $0.50 for eliminating Bob and their own bounty increases by $0.50 to $2
+Bob finished the tournament in 3rd place
+*** SUMMARY ***
+Total pot 2995 | Rake 0
+Board [Kc 8h 3s 6d 2c]
+Seat 1: Alice (big blind) showed [Kd Qd] and won (2995) with a pair of Kings
+Seat 2: Bob (button) showed [Ah 7h] and lost with high card Ace
+Seat 3: Carol (small blind) folded before Flop
+
+
+
+PokerStars Hand #263100000003: Tournament #3100000001, $1+$1+$0.20 USD Hold'em No Limit - Level III (25/50) - 2026/10/06 20:20:00 UTC [2026/10/06 16:20:00 ET]
+Table '3100000001 1' 9-max Seat #3 is the button
+Seat 1: Alice (3435 in chips)
+Seat 3: Carol (1465 in chips)
+Carol: posts small blind 25
+Alice: posts big blind 50
+*** HOLE CARDS ***
+Dealt to Alice [9h 9c]
+Carol: raises 1415 to 1465 and is all-in
+Alice: calls 1415
+*** FLOP *** [Td 6c 2h]
+*** TURN *** [Td 6c 2h] [Js]
+*** RIVER *** [Td 6c 2h Js] [4d]
+*** SHOW DOWN ***
+Alice: shows [9h 9c] (a pair of Nines)
+Carol: shows [As 5s] (high card Ace)
+Alice collected 2930 from pot
+Alice wins $1 for eliminating Carol and their own bounty increases by $1 to $3
+Carol finished the tournament in 2nd place and received $1.40.
+Alice wins the tournament and receives $2.60 - congratulations!
+*** SUMMARY ***
+Total pot 2930 | Rake 0
+Board [Td 6c 2h Js 4d]
+Seat 1: Alice (big blind) showed [9h 9c] and won (2930) with a pair of Nines
+Seat 3: Carol (button) (small blind) showed [As 5s] and lost with high card Ace
+
+
+
+PokerStars Hand #263100000101: Tournament #3100000002, $0.98+$0.12 USD Hold'em No Limit - Level I (10/20) - 2026/10/07 19:00:00 UTC [2026/10/07 15:00:00 ET]
+Table '3100000002 1' 6-max Seat #1 is the button
+Seat 1: Erin (1000 in chips)
+Seat 2: Alice (1000 in chips)
+Seat 3: Bob (1000 in chips)
+Alice: posts small blind 10
+Bob: posts big blind 20
+*** HOLE CARDS ***
+Dealt to Alice [Js Jh]
+Erin: folds
+Alice: raises 980 to 1000 and is all-in
+Bob: calls 980 and is all-in
+*** FLOP *** [As 4c 9d]
+*** TURN *** [As 4c 9d] [Tc]
+*** RIVER *** [As 4c 9d Tc] [5s]
+*** SHOW DOWN ***
+Alice: shows [Js Jh] (a pair of Jacks)
+Bob: shows [Ac Kd] (a pair of Aces)
+Bob collected 2000 from pot
+Alice finished the tournament in 3rd place
+*** SUMMARY ***
+Total pot 2000 | Rake 0
+Board [As 4c 9d Tc 5s]
+Seat 1: Erin (button) folded before Flop (didn't bet)
+Seat 2: Alice (small blind) showed [Js Jh] and lost with a pair of Jacks
+Seat 3: Bob (big blind) showed [Ac Kd] and won (2000) with a pair of Aces
+
+
+
+PokerStars Hand #263100000102: Tournament #3100000002, $0.98+$0.12 USD Hold'em No Limit - Level II (15/30) - 2026/10/07 19:05:00 UTC [2026/10/07 15:05:00 ET]
+Table '3100000002 1' 6-max Seat #2 is the button
+Seat 1: Erin (1000 in chips)
+Seat 2: Alice (1000 in chips)
+Seat 3: Bob (2000 in chips)
+Bob: posts small blind 15
+Erin: posts big blind 30
+*** HOLE CARDS ***
+Dealt to Alice [Ac Qc]
+Alice: raises 45 to 75
+Bob: folds
+Erin: folds
+Uncalled bet (45) returned to Alice
+Alice collected 75 from pot
+Alice: doesn't show hand
+*** SUMMARY ***
+Total pot 75 | Rake 0
+Seat 1: Erin (big blind) folded before Flop
+Seat 2: Alice (button) collected (75)
+Seat 3: Bob (small blind) folded before Flop
+
+
+
+PokerStars Hand #263100000103: Tournament #3100000002, $0.98+$0.12 USD Hold'em No Limit - Level IV (50/100) - 2026/10/07 19:20:00 UTC [2026/10/07 15:20:00 ET]
+Table '3100000002 1' 6-max Seat #2 is the button
+Seat 2: Alice (1500 in chips)
+Seat 3: Bob (2500 in chips)
+Alice: posts the ante 10
+Bob: posts the ante 10
+Alice: posts small blind 50
+Bob: posts big blind 100
+*** HOLE CARDS ***
+Dealt to Alice [Ks 9s]
+Alice: raises 1390 to 1490 and is all-in
+Bob: calls 1390
+*** FLOP *** [2h 7d Qc]
+*** TURN *** [2h 7d Qc] [3s]
+*** RIVER *** [2h 7d Qc 3s] [8h]
+*** SHOW DOWN ***
+Alice: shows [Ks 9s] (high card King)
+Bob: shows [Ad 4c] (high card Ace)
+Bob collected 3000 from pot
+Alice finished the tournament in 2nd place and received $1.44.
+Bob wins the tournament and receives $2.16 - congratulations!
+*** SUMMARY ***
+Total pot 3000 | Rake 0
+Board [2h 7d Qc 3s 8h]
+Seat 2: Alice (button) (small blind) showed [Ks 9s] and lost with high card King
+Seat 3: Bob (big blind) showed [Ad 4c] and won (3000) with high card Ace
+
+
+

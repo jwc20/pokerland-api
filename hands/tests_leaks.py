@@ -156,3 +156,70 @@ class CoachPresetTests(APITestCase):
         rows = client.get("/api/leaks/presets/").data
 
         self.assertEqual(next(row["value"] for row in rows if row["key"] == "open_bb"), 3.0)
+
+
+class PostflopLeakTests(APITestCase):
+    """B5's leak alerts after the flop."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        for name in (*StatsTests.FIXTURES, "postflop_leaks.txt"):
+            add_stream(self.user, name)
+        self.client.force_authenticate(self.user)
+
+    def leaks(self, **params):
+        response = self.client.get("/api/leaks/", {"tz": "UTC", "group": "postflop", **params})
+        self.assertEqual(response.status_code, 200, response.data)
+        return {check["key"]: check for check in response.data}
+
+    def hand_ids(self, leak):
+        return {hand["hand_id"] for hand in self.client.get("/api/hands/", {"leak": leak}).data["results"]}
+
+    def test_the_checks_after_the_flop(self):
+        self.assertEqual(
+            list(self.leaks()), ["folded_strong", "missed_thin_value", "multiway_bluff", "big_pot_small_hand"]
+        )
+
+    def test_a_set_folded_on_a_dry_board(self):
+        self.assertEqual(self.leaks()["folded_strong"]["share"], proportion(1, 1))
+        self.assertEqual(self.hand_ids("folded_strong"), {"262300000002"})
+
+    def test_the_river_checked_back_and_won(self):
+        self.assertEqual(self.leaks()["missed_thin_value"]["share"], proportion(1, 1))
+        self.assertEqual(self.hand_ids("missed_thin_value"), {"262400000001"})
+
+    def test_bluffs_and_cbets_into_too_many(self):
+        # Of six hands with a bluff or a c-bet after the flop: a c-bet with nothing into two, a river raise with
+        # nothing into two, and a c-bet with nothing into three.
+        self.assertEqual(self.leaks()["multiway_bluff"]["share"], proportion(3, 6))
+        self.assertEqual(self.hand_ids("multiway_bluff"), {"262289822697", "262289826745", "262400000003"})
+
+    def test_the_presets_set_how_many_is_too_many(self):
+        self.client.patch("/api/leaks/presets/", {"bluff_opponents": 3}, format="json")
+
+        self.assertEqual(self.hand_ids("multiway_bluff"), {"262400000003"})
+
+    def test_a_big_pot_with_second_pair_at_deep_stacks(self):
+        # Ace-seven put 95 BB in with top pair, and ace-king its 100 BB with top pair, top kicker; queen-jack put
+        # 42 BB in with second pair, 200 BB deep.
+        self.assertEqual(self.leaks()["big_pot_small_hand"]["share"], proportion(1, 3))
+        self.assertEqual(self.hand_ids("big_pot_small_hand"), {"262400000002"})
+
+    def test_marking_a_check_reviewed(self):
+        before = self.leaks()["multiway_bluff"]
+
+        response = self.client.post("/api/leaks/multiway_bluff/reviewed/")
+        after = self.leaks()["multiway_bluff"]
+
+        self.assertEqual((before["reviewed"], before["new"]), (None, 3))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(after["reviewed"])
+        self.assertEqual(after["new"], 0)
+        self.assertEqual(self.client.post("/api/leaks/hands_per_orbit/reviewed/").status_code, 404)
+
+    def test_responses_match_the_schema(self):
+        check = self.leaks()["folded_strong"]
+        review = self.client.post("/api/leaks/folded_strong/reviewed/").data
+
+        self.assertEqual(set(check), schema_properties("Leak"))
+        self.assertEqual(set(review), schema_properties("LeakReview"))

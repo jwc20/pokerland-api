@@ -4,7 +4,9 @@
 player it counts the did/could pairs a tracker's statistics are made of, as
 PokerTracker defines them: how often a player did something ÷ how often they
 could have. For the hand it works out the situation before the flop, the pot
-and the stacks on each street, the board's texture, and what the hero held.
+and the stacks on each street, the board's texture, and what the hero held and
+how they played each street. Every bet and raise is listed with its size, what
+its maker held when their cards are known, and how it was answered.
 
 Like the rest of tracker.parsing it never imports Django, so the parser tests
 run it on the fixture files offline.
@@ -55,14 +57,53 @@ STATS = {
 POSTFLOP_ACTIONS = ("bets", "raises", "calls", "checks", "folds")
 _ACTION_COUNT = {"bet": "bets", "raise": "raises", "call": "calls", "check": "checks", "fold": "folds"}
 
-# Starting-hand groups from the Johns Hopkins course's hand classes [JHU 3; JHU 4], first match wins.
+# Starting-hand groups from the Johns Hopkins course's hand classes [JHU 3; JHU 4], first match wins; "weak_ace"
+# and "junk" catch the rest.
 HAND_GROUPS = ("premium", "big_pair", "medium_pair", "small_pair", "big_ace", "suited_connector", "trouble")
+ALL_HAND_GROUPS = (*HAND_GROUPS, "weak_ace", "junk")
 _PREMIUM = {"AA", "KK", "QQ", "AK"}
 _TROUBLE = {"AJ", "AT", "KQ", "KJ", "KT", "QJ", "QT", "JT"}  # good-looking hands that are often dominated
 
+# Made hands after the flop by what they are worth (practice.spots names its hand classes from these): a good hand,
+# one that beats bluffs and little else (Omaha's one_pair too), and the draws of eight outs or more.
+STRONG = {
+    "overpair",
+    "top_pair_top_kicker",
+    "top_pair",
+    "two_pair",
+    "set",
+    "trips",
+    "three_of_a_kind",
+    "straight",
+    "flush",
+    "full_house",
+    "four_of_a_kind",
+    "straight_flush",
+}
+SHOWDOWN_VALUE = {"second_pair", "bottom_pair", "pocket_pair", "underpair", "one_pair"}
+STRONG_DRAWS = {"nut_flush_draw", "flush_draw", "open_ended", "double_gutshot"}
+# How strong a hand was when its player bet, weakest first: the sizing report's classes (B4).
+STRENGTHS = ("nothing", "draw", "weak", "strong", "nuts")
+# Hold'em hands that can be the nuts: nothing weaker ever is, since a set is always possible.
+_NUT_CANDIDATES = {"set", "trips", "straight", "flush", "full_house", "four_of_a_kind", "straight_flush"}
+# Boards by what they let happen, first match wins: three or more of a suit, a pair, or a draw-heavy board
+# (two of a suit and a straight's worth of ranks, or more); "dry" otherwise.
+TEXTURES = ("monotone", "paired", "wet", "dry")
+# Positions in the order they act after the flop; heads-up the big blind acts first and the button ("BTN") last.
+ACT_ORDER = ("SB", "BB", "UTG", "UTG+1", "UTG+2", "UTG+3", "UTG+4", "UTG+5", "LJ", "HJ", "CO", "BTN")
+# What a hero's bets give away, flagged in `facts["hero"]["flags"]` (B4): a bluff bigger than the pot, a bet under a
+# third of the pot on a draw-heavy board, and a second barrel of the same chips although the pot had grown.
+SIZING_FLAGS = ("overbet_bluff", "small_on_wet", "same_chips_barrel")
+SMALL_BET = 1 / 3
+SAME_CHIPS = 0.1  # within this share of the first barrel
+# The made hands the strong-fold check counts [JHU 8]: a set, or two pair using both hole cards.
+STRONG_FOLDS = {"set", "two_pair"}
+DRY_WETNESS = 1  # at most this wet: no flush draw beside a straight's worth of ranks, and no flush
+
 
 def hand_facts(hand, with_equity=True):
-    """The facts of a hand from `pokerstars.extract`: {"hand": Hand columns, "players": HandPlayer rows}.
+    """The facts of a hand from `pokerstars.extract`: {"hand": Hand columns, "players": HandPlayer rows, "bets":
+    HandBet rows}.
 
     With `with_equity`, a hand whose money went in before the river with every live hand shown also gets each live
     player's equity and expected result then (tracker.parsing.equity.all_in).
@@ -70,7 +111,30 @@ def hand_facts(hand, with_equity=True):
     walk = _Walk(hand)
     for event in hand["events"]:
         walk.apply(event)
-    return {"hand": walk.hand_columns(), "players": walk.player_rows(equity.all_in(hand) if with_equity else None)}
+    players = walk.player_rows(equity.all_in(hand) if with_equity else None)
+    return {"hand": walk.hand_columns(), "players": players, "bets": walk.bet_rows()}
+
+
+def strength(made, drawing=(), nuts=False):
+    """How strong a hand after the flop is, for sizing tells (B4): the nuts, strong, weak, a draw, or nothing."""
+    if made in STRONG:
+        return "nuts" if nuts else "strong"
+    if made in SHOWDOWN_VALUE:
+        return "weak"
+    if STRONG_DRAWS & set(drawing):
+        return "draw"
+    return "nothing"
+
+
+def texture_class(texture):
+    """A board's texture as one of TEXTURES: monotone, paired, wet or dry."""
+    if not texture:
+        return ""
+    if texture["suited"] >= 3:
+        return "monotone"
+    if texture["paired"]:
+        return "paired"
+    return "wet" if texture["wetness"] >= 2 else "dry"
 
 
 class _Player:
@@ -106,6 +170,11 @@ class _Player:
         self.three_bet_x = None
         self.three_bet_callers = None
         self.first_raise_all_in = None
+        # The leak checks after the flop (hands.leaks, B5): facing a bet with a set or two pair on a dry, unpaired
+        # board, and folding; checked to in position on the river, and checking back.
+        self.strong_fold = [0, 0]
+        self.river_checked_to = False
+        self.checked_back = False
 
     def chance(self, stat, did):
         could, done = self.counts[stat]
@@ -131,6 +200,11 @@ class _Walk:
         self.acted_here = set()
         self.streets = {}
         self.hero_spr = None
+        self.board = []
+        self.bets = []  # every bet and raise, as HandBet rows
+        self.answering = None  # the last bet or raise of this street, while the others answer it
+        self.cbet_now = False  # the move being made is a c-bet
+        self.lines = {}  # street -> how the hero played it
 
     def apply(self, event):
         kind = event["type"]
@@ -145,7 +219,9 @@ class _Walk:
             if event.get("all_in"):
                 player.all_in_street = player.all_in_street or "preflop"
         elif kind in MOVES:
+            self.cbet_now = False
             (self.preflop if self.street == "preflop" else self.postflop)(player, kind)
+            self.answer(player, kind)
             self.move(player, kind, amount, event.get("all_in", False))
         elif kind == "return":
             back = min(amount, player.bet)
@@ -194,23 +270,58 @@ class _Walk:
         street = self.street
         raising = kind in AGGRESSIVE
         opener = self.raisers[-1] if self.raisers else None  # the preflop aggressor
+        line = self.lines.get(street) if player.name == self.hand["hero"] else None
         if self.top() == player.bet:  # nothing to call
             if player.name == opener and self.cbet_chance(player, street):
                 player.chance(f"cbet_{street}", raising)
                 if raising:
                     self.cbettor = player.name
+                    self.cbet_now = True
             if street == "flop" and opener and player.name != opener and opener not in self.acted_here:
                 aggressor = self.players[opener]
                 if not aggressor.folded and not aggressor.all_in_street:  # they could still have bet
                     player.chance("donk_flop", raising)
             if kind == "check":
                 player.checked_on.add(street)
+            if street == "river" and self.checked_to_last(player):
+                player.river_checked_to = True
+                player.checked_back = kind == "check"
+            if line and line["first"] is None and line["faced"] is None:
+                line["first"] = kind
         else:
             if self.cbettor and self.raises_here == 1 and player.name != self.cbettor:
                 player.chance(f"fold_to_cbet_{street}", kind == "fold")
             if street in player.checked_on and street not in player.check_raise_chances:
                 player.check_raise_chances.add(street)
                 player.chance("check_raise", kind == "raise")
+            if len(player.cards) == 2 and self.strong_on_dry_board(player):
+                player.strong_fold = [1, int(player.strong_fold[1] or kind == "fold")]
+            if line and line["faced"] is None:
+                line["faced"] = kind
+
+    def checked_to_last(self, player):
+        """Whether everyone else still able to bet has checked this street, so the player acts last, in position."""
+        others = [o for o in self.players.values() if o is not player and not o.folded and not o.all_in_street]
+        return bool(others) and self.raises_here == 0 and all(o.name in self.acted_here for o in others)
+
+    def strong_on_dry_board(self, player):
+        """Whether a hold'em player holds a set, or two pair with both cards, on a dry board with no pair [JHU 8]."""
+        texture = board_texture(self.board)
+        if not texture or texture["paired"] or texture["wetness"] > DRY_WETNESS:
+            return False
+        return made_hand(player.cards, self.board) in STRONG_FOLDS
+
+    def answer(self, player, kind):
+        """Notes how the bet or raise being answered went: called or raised, and what the hero said to it."""
+        bet = self.answering
+        if bet is None or bet["name"] == player.name:
+            return
+        if kind == "raise":
+            bet["outcome"] = "raised"
+        elif kind == "call" and bet["outcome"] == "folded":
+            bet["outcome"] = "called"
+        if player.name == self.hand["hero"] and not bet["hero_response"] and kind in ("fold", "call", "raise"):
+            bet["hero_response"] = kind
 
     def cbet_chance(self, player, street):
         """Whether betting first on `street` is a continuation bet: on the flop, or after one that went unraised."""
@@ -227,6 +338,7 @@ class _Walk:
         if raising:
             before = self.pot + sum(other.bet for other in self.players.values())
             player.sizes.append([self.street, round(amount / before, 3) if before else None])
+            self.record_bet(player, kind, amount, before, all_in)
         player.stack -= amount
         player.bet += amount
         player.folded = player.folded or kind == "fold"
@@ -250,6 +362,42 @@ class _Walk:
             self.raises_here += 1
             self.aggressors[self.street] = player.name
 
+    def record_bet(self, player, kind, amount, before, all_in):
+        """Lists a bet or raise: its size, what the player held if their cards are known, and how it went."""
+        made, held, wetness = "", "", None
+        if self.street in POSTFLOP:
+            wetness = board_texture(self.board)["wetness"]
+            if player.cards:
+                made = made_hand(player.cards, self.board)
+                holdem = len(player.cards) == 2
+                drawing = draws(player.cards, self.board) if holdem else []
+                nuts = holdem and made in _NUT_CANDIDATES and equity.is_nuts(player.cards, self.board)
+                held = strength(made, drawing, nuts)
+        bet = {
+            "seat": player.seat,
+            "name": player.name,
+            "street": self.street,
+            "order": len(self.bets),
+            "kind": kind,
+            "amount_bb": round(amount / self.bb, 3),
+            "pot_bb": round(before / self.bb, 3),
+            "size": round(amount / before, 3) if before else None,
+            "to_bb": round((player.bet + amount) / self.bb, 3),
+            "opponents": sum(1 for other in self.players.values() if other is not player and not other.folded),
+            "all_in": all_in,
+            "cbet": self.cbet_now,
+            "made": made,
+            "strength": held,
+            "wetness": wetness,
+            "outcome": "folded",  # until someone calls or raises it
+            "hero_response": "",
+        }
+        self.bets.append(bet)
+        self.answering = bet
+        line = self.lines.get(self.street) if player.name == self.hand["hero"] else None
+        if line and "bet" not in line:
+            line["bet"] = bet
+
     def preflop_size(self, player, faced, all_in):
         """Notes the size of the player's raise before the flop, made to `player.bet` over a bet of `faced`."""
         if not player.raised:
@@ -268,11 +416,16 @@ class _Walk:
         self.street = event["street"]
         self.raises_here = 0
         self.cbettor = None
+        self.answering = None
         self.acted_here = set()
+        self.board = event.get("board", self.board)
         alive = [player for player in self.players.values() if not player.folded]
         if self.street in POSTFLOP:
             stacks = sorted(player.stack for player in alive)
             board = event.get("board", [])
+            hero = self.players.get(self.hand["hero"])
+            if hero in alive:
+                self.lines[self.street] = self.line(hero, alive, board)
             self.streets[self.street] = {
                 "pot_bb": round(self.pot / self.bb, 2),
                 "players": len(alive),
@@ -292,6 +445,53 @@ class _Walk:
             for player in alive:
                 player.showdown = True
 
+    def line(self, hero, alive, board):
+        """How the hero comes to a street after the flop: their part before the flop (raised, called, or limped
+        with no raise), whether they act last (null when nobody else can act), the players and the board's texture.
+        Their first move with nothing to call, their answer to the first bet they face, and what came of their first
+        bet are added as the street goes."""
+        if not self.raisers:
+            role = "limped"
+        else:
+            role = "raised" if self.raisers[-1] == hero.name else "called"
+        order = {position: i for i, position in enumerate(ACT_ORDER)}
+        others = [player for player in alive if player is not hero and not player.all_in_street]
+        last = all(order.get(hero.position, 0) > order.get(other.position, 0) for other in others)
+        return {
+            "role": role,
+            "ip": last if others else None,
+            "players": len(alive),
+            "texture": texture_class(board_texture(board)),
+            "first": None,
+            "faced": None,
+        }
+
+    def hero_lines(self):
+        """The hero's lines by street, each with what came of their first bet on it: folded, called or raised."""
+        lines = {}
+        for street, line in self.lines.items():
+            bet = line.get("bet")
+            kept = {key: value for key, value in line.items() if key != "bet"}
+            lines[street] = {**kept, "outcome": bet and bet["outcome"]}
+        return lines
+
+    def sizing_flags(self, hero):
+        """What the hero's bets after the flop give away (SIZING_FLAGS)."""
+        mine = [bet for bet in self.bets if bet["name"] == hero.name and bet["street"] in POSTFLOP]
+        flags = set()
+        for bet in mine:
+            if bet["size"] is not None and bet["size"] > 1 and bet["strength"] == "nothing":
+                flags.add("overbet_bluff")
+            if bet["kind"] == "bet" and bet["size"] is not None and bet["size"] < SMALL_BET and bet["wetness"] >= 2:
+                flags.add("small_on_wet")
+        barrels = {bet["street"]: bet for bet in mine if bet["kind"] == "bet"}
+        for first, second in zip(POSTFLOP, POSTFLOP[1:]):
+            one, two = barrels.get(first), barrels.get(second)
+            if one and two and abs(two["amount_bb"] - one["amount_bb"]) <= SAME_CHIPS * one["amount_bb"]:
+                if two["pot_bb"] > one["pot_bb"]:
+                    flags.add("same_chips_barrel")
+        return [flag for flag in SIZING_FLAGS if flag in flags]
+
     def pot_type(self):
         if self.raisers:
             return ("single_raised", "3bet", "4bet+")[min(len(self.raisers), 3) - 1]
@@ -307,6 +507,9 @@ class _Walk:
             "streets": self.streets,
             "spr": round(flop["effective_bb"] / flop["pot_bb"], 2) if flop and flop["pot_bb"] else None,
         }
+        tournament = hand.get("tournament")
+        if tournament:
+            facts["tournament"] = tournament
         columns = {
             "players_dealt": len(self.players),
             "pot_type": self.pot_type(),
@@ -315,6 +518,7 @@ class _Walk:
             "hero_first_action": "",
             "effective_bb": None,
             "hero_m": None,
+            "level": tournament["level"] if tournament else None,
             "facts": facts,
         }
         if hero is None:
@@ -341,6 +545,11 @@ class _Walk:
                     facts["hero"]["made"][street] = made_hand(hero.cards, board[:cards])
                     if holdem and cards < 5:
                         facts["hero"]["draws"][street] = draws(hero.cards, board[:cards])
+        made = facts["hero"]["made"]
+        # What the hero ended with: their made hand on the last street they saw.
+        facts["hero"]["final"] = next((made[street] for street in reversed(POSTFLOP) if street in made), None)
+        facts["hero"]["lines"] = self.hero_lines()
+        facts["hero"]["flags"] = self.sizing_flags(hero)
         return columns
 
     def m(self, player):
@@ -386,6 +595,11 @@ class _Walk:
                     "three_bet_x": player.three_bet_x,
                     "three_bet_callers": player.three_bet_callers,
                     "first_raise_all_in": player.first_raise_all_in,
+                    "strong_fold_could": player.strong_fold[0],
+                    "strong_fold_did": player.strong_fold[1],
+                    # Checked back the river in position, then won the showdown: value missed [JHU 9].
+                    "thin_value_could": int(player.river_checked_to),
+                    "thin_value_did": int(player.checked_back and player.showdown and player.won > 0),
                     "allin_equity": None if ev is None else round(ev["equity"], 4),
                     "ev_net_bb": None if ev is None else (ev["expected"] * kept - ev["invested"]) / self.bb,
                     "extra": {
@@ -396,6 +610,11 @@ class _Walk:
                 }
             )
         return rows
+
+
+    def bet_rows(self):
+        """Every bet and raise in the order made, as HandBet rows."""
+        return list(self.bets)
 
 
 def _situation(raises, callers):

@@ -1,17 +1,21 @@
-"""Leak checks (B3 of the feature ideas, and B5 to come): how often the hero broke a rule of thumb from the lectures.
+"""Leak checks (B3 and B5 of the feature ideas): how often the hero broke a rule of thumb from the lectures.
 
 A check is a pair of conditions on the hero's HandPlayer rows: the chances to keep its rule, and the times the rule
 was broken. Counted like a statistic, did ÷ could, it gets a Wilson range and a month-by-month trend, and the game
 history can list the hands behind it (`leak_hands`). One check, hands per orbit, is a rate instead.
 
+The checks come in two groups: before the flop, B3's discipline checks (two of them B5's detectors 7 and 8), and
+after it, B5's leak alerts 1, 3, 5 and 9. The user can mark a check reviewed (LeakReview), and its hands from
+before then stop counting as new.
+
 The thresholds are the user's coach presets: the course values in PRESETS unless they set their own. They are
 presets, not truths: the lecturers disagree on some of them (the feature ideas, section 3).
 """
 
-from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q, Sum, Value
+from django.db.models import Avg, Count, Exists, ExpressionWrapper, F, FloatField, OuterRef, Q, Sum, Value
 from django.db.models.functions import Cast, TruncMonth
 
-from hands.models import CoachPresets, HandPlayer
+from hands.models import CoachPresets, HandBet, HandPlayer, LeakReview
 from hands.stats import proportion
 
 # Each preset's course value, the range it may be set in, what it is, and where it comes from.
@@ -79,11 +83,42 @@ PRESETS = {
         "label": "Hands to play an orbit, at most",
         "source": "JHU 3; JHU 4",
     },
+    "bluff_opponents": {
+        "default": 2.0,
+        "min": 1.0,
+        "max": 5.0,
+        "label": "A bluff into this many opponents or more is one too many",
+        "source": "JHU 5",
+    },
+    "cbet_opponents": {
+        "default": 3.0,
+        "min": 2.0,
+        "max": 6.0,
+        "label": "A c-bet into this many opponents or more is one too many",
+        "source": "JHU 5",
+    },
+    "big_pot_bb": {
+        "default": 40.0,
+        "min": 10.0,
+        "max": 200.0,
+        "label": "A big pot: this many big blinds or more put in",
+        "source": "MIT 5; JHU 4",
+    },
+    "deep_bb": {
+        "default": 100.0,
+        "min": 40.0,
+        "max": 400.0,
+        "label": "Deep stacks: an effective stack of this many big blinds or more",
+        "source": "MIT 5; JHU 5",
+    },
 }
 
 PREMIUMS = ("AA", "KK", "QQ", "AKs", "AKo")
 LIMPED = ("unopened", "limped")  # a first call in these is a limp, not a call of a raise
-LEAK_GROUPS = ("preflop",)
+LEAK_GROUPS = ("preflop", "postflop")
+POSTFLOP = ("flop", "turn", "river")
+# One pair, weaker than top pair: what a big pot shouldn't be played with at deep stacks [MIT 5; JHU 4; JHU 5].
+SMALL_PAIRS = ("second_pair", "bottom_pair", "pocket_pair", "underpair")
 
 
 def presets_of(user):
@@ -150,11 +185,39 @@ CHECKS = {
     },
     # Buy in for the full 100 BB, and top up [JHU 3].
     "short_buy_in": lambda p: {"chances": Q(hand__tournament_id=""), "broken": Q(stack_bb__lt=p["buy_in_bb"])},
+    # B5's leak alerts after the flop.
+    # 1. Don't fold a set, or two pair using both cards, on a dry, unpaired board [JHU 8].
+    "folded_strong": lambda p: {"chances": Q(strong_fold_could__gt=0), "broken": Q(strong_fold_did__gt=0)},
+    # 3. Thin value: checking the river back in position, then winning the showdown, left value unasked [JHU 9].
+    "missed_thin_value": lambda p: {"chances": Q(thin_value_could__gt=0), "broken": Q(thin_value_did__gt=0)},
+    # 5. Don't bluff into two or more opponents, or c-bet into three or more [JHU 5]. The chances are the hands with
+    # a bluff (a bet or raise with nothing) or a c-bet after the flop.
+    "multiway_bluff": lambda p: {
+        "chances": _hero_bets(Q(strength="nothing") | Q(cbet=True)),
+        "broken": _hero_bets(
+            Q(strength="nothing", opponents__gte=p["bluff_opponents"])
+            | Q(cbet=True, opponents__gte=p["cbet_opponents"])
+        ),
+    },
+    # 9. Don't play a big pot with a small hand at deep stacks: 40 BB or more in with one pair weaker than top pair
+    # [MIT 5; JHU 4; JHU 5]. Hold'em only, since Omaha's pairs aren't named.
+    "big_pot_small_hand": lambda p: {
+        "chances": Q(invested_bb__gte=p["big_pot_bb"], hand__effective_bb__gte=p["deep_bb"])
+        & ~Q(hand__hero_combo=""),
+        "broken": Q(hand__facts__hero__final__in=SMALL_PAIRS),
+    },
 }
 # Play one or two hands an orbit [JHU 3; JHU 4]: a rate, not a rule kept or broken in a hand.
 ORBIT = "hands_per_orbit"
 LEAK_KEYS = (*CHECKS, ORBIT)
-GROUP_OF = dict.fromkeys(LEAK_KEYS, "preflop")
+AFTER_THE_FLOP = ("folded_strong", "missed_thin_value", "multiway_bluff", "big_pot_small_hand")
+GROUP_OF = {key: "postflop" if key in AFTER_THE_FLOP else "preflop" for key in LEAK_KEYS}
+
+
+def _hero_bets(q):
+    """The hero's rows with a bet or raise after the flop that meets `q`."""
+    bets = HandBet.objects.filter(q, hand=OuterRef("hand"), is_hero=True, street__in=POSTFLOP)
+    return Q(Exists(bets))
 
 
 def _conditions(key, presets):
@@ -171,15 +234,19 @@ def leak_hands(user, key, presets):
     return Q(pk__in=rows.values("hand_id"))
 
 
-def leaks(user, hands, presets, tz):
-    """Every check over the hero's rows in `hands`: its count, its range, its trend by month in `tz`."""
+def leaks(user, hands, presets, tz, group=None):
+    """Every check over the hero's rows in `hands`, or a group's: its count, its range, its trend by month in `tz`,
+    and when the user last marked it reviewed, with the hands that broke it since."""
     rows = HandPlayer.objects.filter(is_hero=True, hand__in=hands)
-    results = [_share_check(key, rows, presets, tz) for key in CHECKS]
-    results.append(_orbit_check(rows, tz))
-    return results
+    reviewed = dict(LeakReview.objects.filter(user=user).values_list("key", "reviewed"))
+    keys = [key for key in LEAK_KEYS if group is None or GROUP_OF[key] == group]
+    return [
+        _orbit_check(rows, tz) if key == ORBIT else _share_check(key, rows, presets, tz, reviewed.get(key))
+        for key in keys
+    ]
 
 
-def _share_check(key, rows, presets, tz):
+def _share_check(key, rows, presets, tz, reviewed=None):
     check = _conditions(key, presets)
     chances = rows.filter(check["chances"])
     counts = {
@@ -188,6 +255,8 @@ def _share_check(key, rows, presets, tz):
         "net_broken_bb": Sum("net_bb", filter=check["broken"], default=0.0),
         "net_kept_bb": Sum("net_bb", filter=~check["broken"], default=0.0),
     }
+    if reviewed:
+        counts["new"] = Count("id", filter=check["broken"] & Q(hand__played_at__gt=reviewed))
     if "below" in check:
         counts.update(below=Count("id", filter=check["below"]), above=Count("id", filter=check["above"]))
     if "average" in check:
@@ -209,6 +278,8 @@ def _share_check(key, rows, presets, tz):
         "above": totals.get("above"),
         "net_broken_bb": round(totals["net_broken_bb"], 2),
         "net_kept_bb": round(totals["net_kept_bb"], 2),
+        "reviewed": reviewed,
+        "new": totals["new"] if reviewed else totals["did"],
         "months": [
             {"month": row["month"].strftime("%Y-%m"), "did": row["did"], "could": row["could"], "rate": None}
             for row in months
@@ -238,6 +309,8 @@ def _orbit_check(rows, tz):
         "above": None,
         "net_broken_bb": None,
         "net_kept_bb": None,
+        "reviewed": None,
+        "new": None,
         "months": [
             {"month": row["month"].strftime("%Y-%m"), "did": row["played"], "could": None, "rate": rate(row)}
             for row in sorted(months, key=lambda row: row["month"])
@@ -260,3 +333,9 @@ def save_presets(user, changes):
         else:
             row.values[name] = value
     row.save()
+
+
+def mark_reviewed(user, key, when):
+    """Marks check `key` reviewed at `when`: its hands from before then are no longer new."""
+    review, _ = LeakReview.objects.update_or_create(user=user, key=key, defaults={"reviewed": when})
+    return review

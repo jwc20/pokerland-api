@@ -20,7 +20,7 @@ import re
 
 from tracker.parsing import pokerstars
 
-PARSER_VERSION = 6
+PARSER_VERSION = 7
 
 HAND_START = re.compile(r"^PokerStars (?:Zoom |Home Game )?(?:Hand|Game) #", re.MULTILINE)
 SUMMARY = "*** SUMMARY ***"
