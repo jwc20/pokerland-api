@@ -126,6 +126,28 @@ flowchart LR
     hands -- "JSON" --> web["pokerland-client"]
 ```
 
+### Kept results
+
+Stats, leaks, the sizing and lines reports, session patterns, the history's tag counts and by the book read a user's
+whole history, so their answers are kept in the database (`hands.results`, the `KeptResult` table) and served in one
+query until something they read changes. Anything that changes it moves the user's `DataVersion` on, and the next
+request works the answer out again:
+
+- uploads and reparses (`hands.store.store_hands`) and `rebuild_sessions`;
+- a hand saved on its own (the admin), a deleted stream, leak presets and reviews, and saved spots (`hands.signals`).
+
+A deploy that changes the code in `hands`, `practice` or `tracker/parsing` starts afresh by itself: each answer is
+kept with a fingerprint of that code. Two rules keep it exact:
+
+- **Code that changes a user's data in another way calls `hands.results.changed(user_id)`** in the same transaction:
+  deleting hands, say, or a bulk update. (A hand's deletion isn't watched by a signal: Django would then load every
+  hand row, replays and all, to delete a stream or a user.)
+- **A view that starts keeping its answer** must read nothing but the data above, or watch what else it reads. Notes
+  aren't watched, since no kept answer reads them; `hands.tests_results` checks the kept views' filters for them.
+
+`pokerlandapi.tests_queries` counts each list endpoint's queries before and after adding rows, so a query per row
+fails the suite.
+
 ### Operations
 
 - `zappa_settings.json` schedules `tracker.tasks.sweep_stale_streams` every five minutes. It re-queues the chunks
@@ -165,7 +187,8 @@ variable is documented in [`.env.example`](.env.example).
 uv run python manage.py test
 ```
 
-The tests use Django's runner and DRF's test client, with SQLite unless `DB_NAME` is set. The parser tests read the
+The tests use Django's runner and DRF's test client, with SQLite unless `DB_NAME` is set (as `.env` sets it when
+you use the local PostgreSQL below; run `DB_NAME= uv run python manage.py test` for SQLite). The parser tests read the
 fixtures, and `pokerlandapi.tests.SchemaTests` runs `spectacular --validate --fail-on-warn`, so a schema warning fails
 the suite. After changing an endpoint, regenerate pokerland-client's API client: run `npm run generate:api` there
 while this server is running.

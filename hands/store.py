@@ -2,7 +2,7 @@
 
 from django.db import transaction
 
-from hands import opponents, sessions, tournaments
+from hands import opponents, results, sessions, tournaments
 from hands.models import Hand, HandBet, HandPlayer
 
 # Hand fields that come straight from the parser; the rest of a parsed hand goes in `replay`, with the pot and
@@ -47,7 +47,8 @@ def store_hands(stream, hands):
 
     Each hand's HandPlayer and HandBet rows are replaced, and the sessions around the hands rebuilt
     (hands.sessions), in the same transaction; so are the tournaments the hands were played in (hands.tournaments)
-    and the counts of the opponents dealt into them (hands.opponents).
+    and the counts of the opponents dealt into them (hands.opponents). The results kept from the user's hands
+    (hands.results) are out of date from the same commit.
     """
     by_id = {(hand["site"], hand["hand_id"]): hand for hand in hands}  # one row per hand, as the upsert requires
     rows = [
@@ -96,3 +97,4 @@ def store_hands(stream, hands):
                 if player["name"] != hand["hero"]
             },
         )
+        results.changed(stream.user_id)

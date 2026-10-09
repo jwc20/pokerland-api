@@ -551,12 +551,17 @@ def rebuild_ratings():
 def skill_ratings(user, now=None):
     """Each of the user's skill ratings as it stands now, its range widened by any time away:
     {skill: {"rating", "deviation", "low", "high", "attempts"}}."""
+    return _ratings_of([user.pk], now).get(user.pk, {})
+
+
+def _ratings_of(user_ids, now=None):
+    """skill_ratings for several users, in one query: {user id: ratings}."""
     now = now or timezone.now()
     found = {}
-    for score in SkillScore.objects.filter(user=user):
+    for score in SkillScore.objects.filter(user_id__in=user_ids):
         deviation = ratings.widened(score.deviation, (now - score.updated).total_seconds() / 86400)
         low, high = ratings.interval(score.rating, deviation)
-        found[score.skill] = {
+        found.setdefault(score.user_id, {})[score.skill] = {
             "rating": round(score.rating),
             "deviation": round(deviation),
             "low": round(low),
@@ -579,8 +584,16 @@ def skill_scores(user):
 
     A rule of thumb counts at half weight and a reflection not at all, so `could` can be less than `attempts`.
     """
-    rows = _skill_rows(user)
-    rated = skill_ratings(user)
+    return skill_scores_of([user.pk])[user.pk]
+
+
+def skill_scores_of(user_ids):
+    """skill_scores for several users, as a class's coaches see them, in two queries: {user id: scores}."""
+    rows, rated = _skill_rows(user_ids), _ratings_of(user_ids)
+    return {user_id: _scores(rows.get(user_id, {}), rated.get(user_id, {})) for user_id in user_ids}
+
+
+def _scores(rows, rated):
     scores = []
     for skill, label in SKILLS.items():
         row = rows.get(skill, {"attempts": 0, "good": 0.0, "total": 0.0})
@@ -591,11 +604,13 @@ def skill_scores(user):
     return scores
 
 
-def _skill_rows(user):
+def _skill_rows(user_ids):
+    """Each user's answers by skill: {user id: {skill: {"attempts", "good", "total"}}}."""
     rows = {}
-    for skills, weight, score in Attempt.objects.filter(user=user).values_list("scenario__skills", "weight", "score"):
+    attempts = Attempt.objects.filter(user_id__in=user_ids)
+    for user_id, skills, weight, score in attempts.values_list("user_id", "scenario__skills", "weight", "score"):
         for skill in skills:
-            row = rows.setdefault(skill, {"attempts": 0, "good": 0.0, "total": 0.0})
+            row = rows.setdefault(user_id, {}).setdefault(skill, {"attempts": 0, "good": 0.0, "total": 0.0})
             row["attempts"] += 1
             if weight and score is not None:
                 row["good"] += weight * score

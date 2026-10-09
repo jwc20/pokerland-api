@@ -23,6 +23,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from hands import results
 from hands.cards import board_reader, equity, outs
 from hands.filters import PLAYED, SORT_ORDERS, UTC, day_bounds, narrow
 from hands.leaks import CHECKS, leak_hands, leaks, mark_reviewed, preset_rows, presets_of, save_presets
@@ -198,8 +199,10 @@ class HandTagsView(APIView):
 
     @extend_schema(responses=HandTagSerializer(many=True))
     def get(self, request):
-        tags = tag_stats(Hand.objects.filter(PLAYED, user=request.user))
-        return Response(HandTagSerializer(tags, many=True).data)
+        def work():
+            return HandTagSerializer(tag_stats(Hand.objects.filter(PLAYED, user=request.user)), many=True).data
+
+        return Response(results.remembered(request.user.pk, "tags", {}, work))
 
 
 class StatsView(APIView):
@@ -211,8 +214,12 @@ class StatsView(APIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         hands = narrow(Hand.objects.filter(PLAYED, user=request.user), filters)
-        stats = hero_stats(hands, filters["group_by"], filters.get("tz", UTC), filters["limit"])
-        return Response(StatGroupSerializer(stats, many=True).data)
+
+        def work():
+            stats = hero_stats(hands, filters["group_by"], filters.get("tz", UTC), filters["limit"])
+            return StatGroupSerializer(stats, many=True).data
+
+        return Response(results.remembered(request.user.pk, "stats", request.query_params, work))
 
 
 class HandNotesView(APIView):
@@ -279,8 +286,12 @@ class LeaksView(APIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         hands = narrow(Hand.objects.filter(PLAYED, user=request.user), filters)
-        checks = leaks(request.user, hands, presets_of(request.user), filters.get("tz", UTC), filters["group"])
-        return Response(LeakSerializer(checks, many=True).data)
+
+        def work():
+            checks = leaks(request.user, hands, presets_of(request.user), filters.get("tz", UTC), filters["group"])
+            return LeakSerializer(checks, many=True).data
+
+        return Response(results.remembered(request.user.pk, "leaks", request.query_params, work))
 
 
 class CoachPresetsView(APIView):
@@ -351,7 +362,11 @@ class SessionPatternsView(APIView):
         query.is_valid(raise_exception=True)
         filters = query.validated_data
         hands = narrow(Hand.objects.filter(PLAYED, user=request.user), filters)
-        return Response(SessionPatternsSerializer(patterns(hands, filters.get("tz", UTC))).data)
+
+        def work():
+            return SessionPatternsSerializer(patterns(hands, filters.get("tz", UTC))).data
+
+        return Response(results.remembered(request.user.pk, "session_patterns", request.query_params, work))
 
 
 # Reports: bet sizing (B4), lines after the flop (B6), and the statistics' dictionary (E5).
@@ -364,7 +379,11 @@ class SizingReportView(APIView):
     @extend_schema(parameters=[HandFilterSerializer], responses=SizingReportSerializer)
     def get(self, request):
         hands = filtered_hands(request)
-        return Response(SizingReportSerializer(sizing(hands)).data)
+
+        def work():
+            return SizingReportSerializer(sizing(hands)).data
+
+        return Response(results.remembered(request.user.pk, "sizing", request.query_params, work))
 
 
 class LinesReportView(APIView):
@@ -374,7 +393,11 @@ class LinesReportView(APIView):
     @extend_schema(parameters=[HandFilterSerializer], responses=LinesReportSerializer)
     def get(self, request):
         hands = filtered_hands(request)
-        return Response(LinesReportSerializer(lines(hands)).data)
+
+        def work():
+            return LinesReportSerializer(lines(hands)).data
+
+        return Response(results.remembered(request.user.pk, "lines", request.query_params, work))
 
 
 def filtered_hands(request):

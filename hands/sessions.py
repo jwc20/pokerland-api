@@ -13,6 +13,7 @@ from collections import defaultdict
 from django.db.models import Count, F, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce, ExtractHour, ExtractIsoWeekDay
 
+from hands import results
 from hands.filters import PLAYED
 from hands.models import Hand, HandPlayer, Session
 from hands.stats import sample_stdev
@@ -86,6 +87,7 @@ def _fill(session, run):
 
 def rebuild(user_id):
     """Builds every one of the user's sessions afresh, e.g. once hands were stored before sessions were."""
+    results.changed(user_id)
     Session.objects.filter(user_id=user_id).delete()
     span = Hand.objects.filter(PLAYED, user_id=user_id).order_by("played_at").values_list("played_at", flat=True)
     if span.exists():

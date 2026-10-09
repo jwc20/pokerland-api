@@ -209,11 +209,9 @@ def progress(league):
     comes one member at a time (member_progress)."""
     from practice import coaching
 
-    assigned = playbooks(league)
-    return [
-        {"member": member.pk, "name": member.user.username, **coaching.progress(member.user, assigned)}
-        for member in sharing(league)
-    ]
+    members = list(sharing(league))
+    found = coaching.progress_of([member.user for member in members], playbooks(league))
+    return [{"member": member.pk, "name": member.user.username, **found[member.user_id]} for member in members]
 
 
 def member_progress(member):

@@ -482,3 +482,33 @@ class HandShare(models.Model):
 
     def __str__(self):
         return f"{self.hand} shared as {self.slug}"
+
+
+class DataVersion(models.Model):
+    """How many times a user's data has changed in ways a kept result (KeptResult, hands.results) can depend on: their
+    hands stored or reparsed, their notes, leak presets and reviews, saved spots and streams."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name="+")
+    version = models.PositiveBigIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.user} at {self.version}"
+
+
+class KeptResult(models.Model):
+    """A result worked out from a user's hands, kept for the next request that asks for it (hands.results). It holds
+    while the user's DataVersion and the code that worked it out are as they were."""
+
+    # No index of its own: the unique constraint on (user, key) serves every lookup by user.
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+", db_index=False)
+    key = models.CharField(max_length=80)  # what it is, and a digest of what it was asked with
+    version = models.PositiveBigIntegerField()  # the user's DataVersion when it was worked out
+    code = models.CharField(max_length=16)  # the code's fingerprint, so a deploy that changes it starts afresh
+    value = models.TextField()  # JSON, as text so its keys keep their order (hands.results)
+    made = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("user", "key"), name="one_kept_result_per_key")]
+
+    def __str__(self):
+        return f"{self.key} for {self.user}"

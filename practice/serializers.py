@@ -483,7 +483,12 @@ class PlaybookSerializer(serializers.ModelSerializer):
         return playbook.owner_id == self.context["request"].user.pk
 
     def get_classes(self, playbook) -> list[str]:
-        return coaching.classes_of(playbook) if self.get_mine(playbook) else []
+        if not self.get_mine(playbook):
+            return []
+        listed = self.context.get("classes")  # a list's: coaching.classes_by_playbook, read once for every row
+        if listed is None:
+            return coaching.classes_of(playbook)
+        return listed.get((playbook.owner_id, playbook.key), [])
 
 
 class FamilyStageSerializer(serializers.Serializer):
@@ -566,8 +571,11 @@ class BookQuerySerializer(serializers.Serializer):
         playbook = attrs["playbook"]
         if not coaching.can_read(self.context["request"].user, playbook):
             raise serializers.ValidationError({"playbook": "Not found."})
-        if "rule" in attrs and attrs["rule"] not in {rule["id"] for rule in playbook.rules}:
+        cards = {card["id"]: card for card in playbook.rules}
+        if "rule" in attrs and attrs["rule"] not in cards:
             raise serializers.ValidationError({"rule": "Not one of the playbook's cards."})
+        if cards.get(attrs.get("rule"), {}).get("adjustment"):
+            raise serializers.ValidationError({"rule": "An adjustment isn't counted by the book: it needs a read."})
         return attrs
 
 
