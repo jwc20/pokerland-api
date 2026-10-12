@@ -234,6 +234,20 @@ def leak_hands(user, key, presets):
     return Q(pk__in=rows.values("hand_id"))
 
 
+def broken_counts(rows, presets):
+    """How many of the hero's `rows` (HandPlayer) broke each check, in CHECKS' order: one query."""
+    conditions = {key: _conditions(key, presets) for key in CHECKS}
+    return rows.aggregate(
+        **{key: Count("id", filter=check["chances"] & check["broken"]) for key, check in conditions.items()}
+    )
+
+
+def broken_in(hand, presets):
+    """The checks the hero broke in one hand, in CHECKS' order: one query over their row."""
+    counts = broken_counts(HandPlayer.objects.filter(hand=hand, is_hero=True), presets)
+    return [key for key in CHECKS if counts[key]]
+
+
 def leaks(user, hands, presets, tz, group=None):
     """Every check over the hero's rows in `hands`, or a group's: its count, its range, its trend by month in `tz`,
     and when the user last marked it reviewed, with the hands that broke it since."""

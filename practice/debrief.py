@@ -276,6 +276,7 @@ def _decision(decision, cards):
         for player in table["players"]
     ]
     return {
+        "id": decision.pk,
         "table": table,
         "line": coach.advice_line(decision.advice, cards, context),
         "hand": decision.hand.number,

@@ -1,0 +1,7 @@
+This brief is one decision at a practice table against a bot: what the coach said, the playbook's rule and move, and
+what the player did. Explain the coach's line:
+- story: one entry, labelled "The spot", saying what the decision turned on, using the numbers.
+- decisions: one entry, d0: what the player did, with its verdict. Say why the rule says what it says here, in plain
+  words, and when it wouldn't apply. If the player left the rule, take their reason seriously and say what would
+  make it right.
+- luck: null.

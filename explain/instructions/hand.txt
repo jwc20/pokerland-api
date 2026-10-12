@@ -1,0 +1,9 @@
+This brief is one hand the player played. Explain what happened and how to improve:
+- story: one entry per street the hand reached, in order, labelled preflop, flop, turn, river or showdown. Say
+  what happened and what mattered on that street.
+- decisions: one entry per decision in the brief, in its order, with its ref and verdict. Say why the move kept or
+  broke the rule, using the decision's numbers (the price, the equity needed, the outs), and in instead what to do
+  next time, or null when the move was fine.
+- luck: when the brief has an all_in, say what the player could expect when the money went in against what
+  happened, and that the decision is what counts. Otherwise null.
+- If the brief lists preflop checks the hand broke, they count as misses too.

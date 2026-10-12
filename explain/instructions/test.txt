@@ -1,0 +1,7 @@
+This brief is a finished aptitude test: each skill's accuracy with its range, and the spots the player missed.
+Explain the result:
+- story: one entry per skill tested, labelled with the skill's name, saying what the accuracy and its range show.
+  A wide range means few spots: say so rather than read much into it.
+- decisions: one entry per missed spot, with its verdict: what the question turned on and what the answer gave up.
+- Suggestions point at the weakest skill whose range is narrow enough to trust.
+- luck: null.

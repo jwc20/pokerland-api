@@ -858,6 +858,7 @@ class MatchSummarySerializer(serializers.ModelSerializer):
 class DebriefDecisionSerializer(serializers.Serializer):
     """A decision the debrief points to: the table as it stood, and what the coach would have said."""
 
+    id = serializers.IntegerField(help_text="The decision's id, for an explanation of the coach's line.")
     table = TableHandSerializer(help_text="The hand up to the decision.")
     line = serializers.CharField(help_text="The coach's line on it.")
     hand = serializers.IntegerField()
