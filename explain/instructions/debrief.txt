@@ -1,0 +1,7 @@
+This brief is a finished coached match against a bot: the result, the bot's style and leak now revealed, the one
+thing to fix, how often each rule was kept, luck against play, and three hands picked to look at. Explain the match:
+- story: up to four entries, labelled "The match", "The opponent", "By the book" and "Luck and play", leaving out
+  any with nothing to say.
+- decisions: one entry per picked hand, with its verdict; say what the decision shows.
+- luck: what the player could expect against what happened, from the brief's luck.
+- The first suggestion is the brief's one thing to fix, if it has one.

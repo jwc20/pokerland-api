@@ -174,3 +174,31 @@ class LeagueListTests(QueryCountTestCase):
         sharing(["one"])()
         self.assertFlat(f"/api/leagues/{league['id']}/progress/", sharing(["two", "three", "four"]))
         self.assertEqual(Membership.objects.filter(league_id=league["id"], shares_progress=True).count(), 4)
+
+
+USAGE = {"input": 1, "cached_input": 0, "cache_write": 0, "output": 1}
+CONTENT = {
+    "headline": "A hand", "summary": "Fine.", "story": [], "decisions": [], "strengths": [],
+    "suggestions": [{"priority": "high", "text": "Fold more.", "practice": None}], "luck": None, "caveats": [],
+}
+
+
+class ExplanationListTests(QueryCountTestCase):
+    def test_a_hands_explanations_and_their_questions(self):
+        from explain.models import Explanation, ExplanationTurn
+
+        hand = Hand.objects.filter(user=self.user).first()
+
+        def explain():
+            for _ in range(3):
+                explanation = Explanation.objects.create(
+                    user=self.user, kind="hand", hand=hand, prompt_version="hand-1.1", brief_hash="0" * 64,
+                    provider="openai", model="gpt-6.1-sol", content=CONTENT, usage=USAGE,
+                )
+                ExplanationTurn.objects.create(
+                    explanation=explanation, question="Why?", answer="Because.", provider="openai",
+                    model="gpt-6.1-sol", usage=USAGE,
+                )
+
+        explain()  # the questions' prefetch runs once there are explanations
+        self.assertFlat("/api/explanations/", explain, {"hand": hand.pk})

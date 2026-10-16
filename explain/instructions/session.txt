@@ -1,0 +1,7 @@
+This brief is one session of real play: its numbers, the checks it broke, and its most telling hands, each with the
+playbook's verdicts on its decisions. Explain the session:
+- story: up to four entries, labelled "Results", "The hands that mattered", "Discipline" and "Pace", leaving out
+  any with nothing to say. Compare the result with the all-in adjusted result: the gap is luck.
+- decisions: none; the brief has no decisions of its own, so leave the list empty.
+- luck: what the all-in adjusted result says about how the cards ran, if the session had all-ins.
+- Suggestions come from the checks broken and the decisions that broke a rule, most often first.

@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "hands",
     "practice",
     "leagues",
+    "explain",
 ]
 
 MIDDLEWARE = [
@@ -140,6 +141,11 @@ SPECTACULAR_SETTINGS = {
         "BetSizeEnum": "hands.stats.BET_SIZE_KEYS",
         "OpponentLabelEnum": "hands.models.Opponent.Label",
         "StatGroupingEnum": "hands.stats.STAT_GROUPINGS",
+        "ExplanationKindEnum": "explain.models.SUBJECTS",
+        "ModelProviderEnum": "explain.catalog.PROVIDER_NAMES",
+        "ExplanationLevelEnum": "explain.serializers.EFFORTS",
+        "ExplanationVerdictEnum": "explain.schema.VERDICTS",
+        "MessageRoleEnum": "explain.serializers.ROLES",
     },
 }
 
@@ -158,6 +164,10 @@ REST_AUTH = {
 # Classes (the leagues app, and practising hands shared with a class) aren't open yet: off unless CLASSES_ENABLED is
 # "true". Off, /api/leagues/ answers 404 and a "shared" practice set is refused; the code and tables stay as they are.
 CLASSES_ENABLED = os.environ.get("CLASSES_ENABLED", "").lower() == "true"
+
+# Explanations written by a model with the player's own key (explain, pokerland-llm-reports.md): on unless
+# EXPLANATIONS_ENABLED is "false", for a staged rollout. Off, /api/explanations/ answers 404.
+EXPLANATIONS_ENABLED = os.environ.get("EXPLANATIONS_ENABLED", "true").lower() != "false"
 
 # Tracker uploads (see pokerland-trackers/protocol/PROTOCOL.md). Chunks are
 # gzipped hand-history bytes; the compressed limit keeps a request within

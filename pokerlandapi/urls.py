@@ -83,6 +83,7 @@ urlpatterns = [
     path("api/public/shares/<str:slug>/", PublicShareView.as_view(), name="public-share"),
     path("api/practice/", include("practice.urls")),
     path("api/leagues/", include("leagues.urls")),
+    path("api/explanations/", include("explain.urls")),
 ]
 
 # The schema and Swagger UI describe every endpoint, so keep them out of prod.

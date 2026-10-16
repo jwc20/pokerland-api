@@ -1,0 +1,9 @@
+This brief is one practice spot the player answered: a question, the table it was asked about, their answer, and the
+reference answer with how it was worked out (graded_by). Explain the spot and the answer:
+- story: two entries, labelled "The spot" (what the question turns on, using the numbers) and "The answer" (why the
+  reference answer is right, and how it was worked out).
+- decisions: one entry, d0: the player's answer, with its verdict. Say what it got right or what it gave up, in big
+  blinds where ev_lost_bb or ev_bb says.
+- The grade stands. For a spot graded by a rule of thumb, say it's a default, not the only sound play. For their
+  own hand, what they did at the table and how the hand ended come last, and never decide what was right.
+- luck: null.

@@ -1,0 +1,5 @@
+Reply with one JSON object and nothing else. It must match this JSON schema exactly, with every field present:
+{schema}
+
+An example of the shape, for a different hand:
+{example}

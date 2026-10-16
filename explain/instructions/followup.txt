@@ -1,0 +1,4 @@
+The player has read your explanation and asks about it. Answer their question about this brief and your
+explanation in plain sentences, at most a short paragraph or two, with no Markdown. Keep to Pokerland's verdicts and
+the brief's numbers, as before. If the question is about something else, say briefly that you can only talk about
+this brief.
